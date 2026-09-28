@@ -1,0 +1,474 @@
+// PeerUp Prisma schema
+// Provider targets: PostgreSQL.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================ ENUMS ============================
+
+enum UserRole {
+  USER
+  MODERATOR
+  ADMIN
+}
+
+enum UserStatus {
+  AVAILABLE
+  SEARCHING
+  MATCHED
+  CONNECTING
+  IN_CALL
+  OFFLINE
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  NON_BINARY
+  PREFER_NOT_TO_SAY
+}
+
+enum EnglishLevel {
+  A1
+  A2
+  B1
+  B2
+  C1
+  C2
+}
+
+enum MatchType {
+  RANDOM
+  SIMILAR_LEVEL
+  INTERVIEW
+  BUSINESS
+  CASUAL
+}
+
+enum CallStatus {
+  MATCHED
+  SIGNALING
+  CONNECTING
+  CONNECTED
+  ENDED
+  FAILED
+  CANCELLED
+}
+
+enum CallEndReason {
+  USER_HANGUP
+  USER_DISCONNECTED
+  PEER_DISCONNECTED
+  CALL_TIMEOUT
+  SIGNALING_FAILED
+  MATCH_TIMEOUT
+  MODERATOR_NA
+  SYSTEM
+}
+
+enum ReportReason {
+  HARASSMENT
+  ABUSIVE_LANGUAGE
+  SPAM
+  INAPPROPRIATE_BEHAVIOR
+  FAKE_PROFILE
+  OTHER
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  RESOLVED
+  DISMISSED
+}
+
+enum MessageType {
+  TEXT
+  SYSTEM
+}
+
+enum SubscriptionPlan {
+  FREE
+  PREMIUM
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  INACTIVE
+  CANCELED
+  PAST_DUE
+}
+
+enum UsageKind {
+  VOICE_CALL
+  AI_CONVERSATION
+  AI_SECONDS
+}
+
+enum AISessionStatus {
+  ACTIVE
+  ENDED
+}
+
+enum NotificationType {
+  SUBSCRIPTION
+  SYSTEM
+  REMINDER
+  STREAK
+}
+
+enum BlockSource {
+  DURING_CALL
+  PROFILE
+}
+
+// ============================ AUTH ============================
+
+model User {
+  id             String     @id @default(uuid())
+  email          String     @unique
+  phone          String?    @unique
+  passwordHash   String
+  role           UserRole   @default(USER)
+  status         UserStatus @default(OFFLINE)
+  lastSeenAt     DateTime?
+  isBanned       Boolean    @default(false)
+  banReason      String?
+  suspendedUntil DateTime?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  profile          Profile?
+  refreshTokens    RefreshToken[]
+  blockers         Block[]        @relation("Blocker")
+  blockedUsers     Block[]        @relation("Blocked")
+  reports          Report[]       @relation("Reporter")
+  reportedUsers    Report[]       @relation("ReportedUser")
+  callsAsA         CallSession[]  @relation("CallUserA")
+  callsAsB         CallSession[]  @relation("CallUserB")
+  matchesAsA       Match[]        @relation("MatchUserA")
+  matchesAsB       Match[]        @relation("MatchUserB")
+  subscriptions    Subscription[]
+  usageEntries     Usage[]
+  userInterests    UserInterest[] @relation("UserInterestUser")
+  aiSessions       AISession[]
+  aiFeedback       AIFeedback[]
+  notifications    Notification[]
+  deviceTokens     DeviceToken[]
+  conversationsAsA Conversation[] @relation("ConversationUserA")
+  conversationsAsB Conversation[] @relation("ConversationUserB")
+  messages         Message[]
+
+  @@index([email])
+  @@index([status, lastSeenAt])
+  @@index([lastSeenAt])
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  userAgent String?
+  ip        String?
+  expiresAt DateTime
+  revokedAt DateTime?
+  lastUsed  DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+// ============================ PROFILE ============================
+
+model Profile {
+  id                  String       @id @default(uuid())
+  userId              String       @unique
+  user                User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                String
+  avatar              String?
+  gender              Gender       @default(PREFER_NOT_TO_SAY)
+  dateOfBirth         DateTime?
+  country             String?
+  nativeLanguage      String       @default("English")
+  learningLanguage    String       @default("English")
+  englishLevel        EnglishLevel @default(B1)
+  bio                 String?
+  conversationGoals   String[]     @default([])
+  showAge             Boolean      @default(false)
+  showGender          Boolean      @default(true)
+  onboardingCompleted Boolean      @default(false)
+  timeZone            String       @default("UTC")
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  userInterests UserInterest[]
+
+  @@index([englishLevel])
+  @@index([nativeLanguage])
+}
+
+model Interest {
+  id            String         @id @default(uuid())
+  name          String         @unique
+  category      String         @default("general")
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  userInterests UserInterest[] @relation("UserInterestInterest")
+}
+
+model UserInterest {
+  userId     String
+  profileId  String
+  interestId String
+
+  user     User     @relation("UserInterestUser", fields: [userId], references: [id], onDelete: Cascade)
+  profile  Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  interest Interest @relation("UserInterestInterest", fields: [interestId], references: [id], onDelete: Cascade)
+
+  @@id([userId, interestId])
+  @@index([interestId])
+  @@index([profileId])
+}
+
+// ============================ MATCH / CALLS ============================
+
+model Match {
+  id            String       @id @default(uuid())
+  userAId       String
+  userBId       String
+  userA         User         @relation("MatchUserA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB         User         @relation("MatchUserB", fields: [userBId], references: [id], onDelete: Cascade)
+  matchType     MatchType    @default(RANDOM)
+  score         Int?
+  matchedAt     DateTime     @default(now())
+  callSessionId String?      @unique
+  callSession   CallSession? @relation(fields: [callSessionId], references: [id], onDelete: SetNull)
+
+  @@index([userAId, matchedAt])
+  @@index([userBId, matchedAt])
+  @@index([userAId, userBId])
+}
+
+model CallSession {
+  id              String         @id @default(uuid())
+  userAId         String
+  userBId         String
+  userA           User           @relation("CallUserA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB           User           @relation("CallUserB", fields: [userBId], references: [id], onDelete: Cascade)
+  match           Match?
+  status          CallStatus     @default(MATCHED)
+  startedAt       DateTime       @default(now())
+  connectedAt     DateTime?
+  endedAt         DateTime?
+  duration        Int? // seconds
+  endReason       CallEndReason?
+  endedBy         String? // userId who ended
+  endReasonDetail String?
+  region          String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  reports Report[]
+
+  @@index([userAId, status])
+  @@index([userBId, status])
+  @@index([status, createdAt])
+  @@index([createdAt])
+}
+
+// ============================ MODERATION ============================
+
+model Block {
+  id        String      @id @default(uuid())
+  blockerId String
+  blockedId String
+  blocker   User        @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked   User        @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+  source    BlockSource @default(PROFILE)
+  createdAt DateTime    @default(now())
+
+  @@unique([blockerId, blockedId])
+  @@index([blockerId])
+  @@index([blockedId])
+}
+
+model Report {
+  id             String       @id @default(uuid())
+  reporterId     String
+  reportedUserId String
+  callId         String?
+  reporter       User         @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  reportedUser   User         @relation("ReportedUser", fields: [reportedUserId], references: [id], onDelete: Cascade)
+  call           CallSession? @relation(fields: [callId], references: [id], onDelete: SetNull)
+  reason         ReportReason
+  description    String?
+  status         ReportStatus @default(PENDING)
+  moderationNote String?
+  resolvedBy     String?
+  resolvedAt     DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@index([status, createdAt])
+  @@index([reportedUserId])
+  @@index([createdAt])
+}
+
+// ============================ TEXT CHAT ============================
+
+model Conversation {
+  id            String    @id @default(uuid())
+  userAId       String
+  userBId       String
+  userA         User      @relation("ConversationUserA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB         User      @relation("ConversationUserB", fields: [userBId], references: [id], onDelete: Cascade)
+  callId        String?
+  lastMessageAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  messages      Message[]
+
+  @@unique([userAId, userBId])
+  @@index([userAId, lastMessageAt])
+  @@index([userBId, lastMessageAt])
+}
+
+model Message {
+  id             String       @id @default(uuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  content        String
+  messageType    MessageType  @default(TEXT)
+  createdAt      DateTime     @default(now())
+  readAt         DateTime?
+
+  @@index([conversationId, createdAt])
+}
+
+// ============================ SUBSCRIPTION ============================
+
+model Subscription {
+  id                     String             @id @default(uuid())
+  userId                 String             @unique
+  user                   User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan                   SubscriptionPlan   @default(FREE)
+  status                 SubscriptionStatus @default(ACTIVE)
+  provider               String?
+  providerSubscriptionId String?
+  startedAt              DateTime           @default(now())
+  renewsAt               DateTime?
+  canceledAt             DateTime?
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+
+  @@index([plan])
+}
+
+model Usage {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date      String // user-local date YYYY-MM-DD
+  kind      UsageKind
+  value     Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([userId, date, kind])
+  @@index([date])
+}
+
+// ============================ AI ============================
+
+model AICharacter {
+  id           String   @id @default(uuid())
+  name         String
+  description  String
+  avatar       String?
+  personality  String
+  difficulty   String   @default("intermediate")
+  scenario     String
+  systemPrompt String
+  voiceConfig  Json?
+  isPremium    Boolean  @default(false)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sessions AISession[]
+
+  @@index([isActive])
+}
+
+model AISession {
+  id          String          @id @default(uuid())
+  userId      String
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  characterId String?
+  character   AICharacter?    @relation(fields: [characterId], references: [id], onDelete: SetNull)
+  status      AISessionStatus @default(ACTIVE)
+  startedAt   DateTime        @default(now())
+  endedAt     DateTime?
+  transcript  Json            @default("[]")
+  wordCount   Int?            @default(0)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  feedback    AIFeedback?
+
+  @@index([userId, createdAt])
+}
+
+model AIFeedback {
+  id                    String     @id @default(uuid())
+  userId                String
+  user                  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  aiSessionId           String?    @unique
+  aiSession             AISession? @relation(fields: [aiSessionId], references: [id], onDelete: Cascade)
+  callSessionId         String?
+  overallScore          Int?
+  grammarFeedback       Json?
+  vocabularyFeedback    Json?
+  fluencyFeedback       Json?
+  pronunciationFeedback Json?
+  suggestedSentences    String[]   @default([])
+  wordsToLearn          String[]   @default([])
+  createdAt             DateTime   @default(now())
+
+  @@index([userId, createdAt])
+}
+
+// ============================ NOTIFICATIONS ============================
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType @default(SYSTEM)
+  title     String
+  body      String
+  data      Json?
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model DeviceToken {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  platform  String   @default("ios")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
