@@ -17,6 +17,7 @@ export default () => ({
     issuer: process.env.JWT_ISSUER || 'peerup',
   },
   webrtc: {
+    reconnectTimeoutSeconds: Math.max(1, Number(process.env.CALL_RECONNECT_TIMEOUT_SECONDS) || 15),
     stunUrl: process.env.STUN_URL || 'stun:stun.l.google.com:19302',
     turnUrl: process.env.TURN_URL,
     turnUsername: process.env.TURN_USERNAME,

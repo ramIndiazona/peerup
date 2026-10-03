@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CallStatus, CallEndReason } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -17,10 +17,16 @@ export interface CallRedisState {
 }
 
 @Injectable()
-export class CallsService {
+export class CallsService implements OnModuleDestroy {
   private readonly logger = new Logger(CallsService.name);
   private readonly webRtcTimeoutSeconds: number;
   private readonly postCallAvailableSeconds: number;
+  readonly reconnectTimeoutSeconds: number;
+  private reconnectTimers = new Map<string, NodeJS.Timeout>();
+  /** How many extra attempts the grace period gets when the call lock is busy. */
+  private readonly recoveryLockRetries = 3;
+  /** Backoff between those extra attempts. */
+  private readonly recoveryLockRetryMs = 1000;
   private connectTimers = new Map<string, NodeJS.Timeout>();
 
   constructor(
@@ -30,6 +36,7 @@ export class CallsService {
     private readonly events: RealtimeEventsService,
     config: ConfigService,
   ) {
+    this.reconnectTimeoutSeconds = config.get<number>('webrtc.reconnectTimeoutSeconds', 15);
     this.webRtcTimeoutSeconds = config.get<number>('matchmaking.webRtcTimeoutSeconds', 30);
     this.postCallAvailableSeconds = config.get<number>('matchmaking.postCallAvailableSeconds', 3);
   }
@@ -92,11 +99,15 @@ export class CallsService {
   }
 
   async confirmSignaling(callId: string): Promise<void> {
-    await this.updateStatus(callId, CallStatus.SIGNALING);
-    const state = await this.getCallState(callId);
-    if (state) {
+    await this.withCallLock(callId, async () => {
+      const state = await this.getCallState(callId);
+      if (!state || state.status === CallStatus.CONNECTED || this.isTerminal(state.status)) return;
+      await this.prisma.callSession.updateMany({
+        where: { id: callId, status: { notIn: [CallStatus.ENDED, CallStatus.CANCELLED, CallStatus.CONNECTED] } },
+        data: { status: CallStatus.SIGNALING },
+      });
       await this.redis.setJson(this.callKey(callId), { ...state, status: CallStatus.SIGNALING }, this.webRtcTimeoutSeconds * 4);
-    }
+    });
   }
 
   async confirmConnecting(callId: string): Promise<void> {
@@ -104,26 +115,35 @@ export class CallsService {
   }
 
   async confirmConnected(callId: string): Promise<void> {
-    await this.updateStatus(callId, CallStatus.CONNECTED);
-    this.clearConnectTimer(callId);
-    const state = await this.getCallState(callId);
-    if (state) {
-      await this.redis.setJson(this.callKey(callId), { ...state, status: CallStatus.CONNECTED });
-    }
-    const db = await this.prisma.callSession.findUnique({ where: { id: callId } });
-    if (db && !db.connectedAt) {
-      await this.prisma.callSession.update({
-        where: { id: callId },
-        data: { connectedAt: new Date() },
+    await this.withCallLock(callId, async () => {
+      const state = await this.getCallState(callId);
+      if (!state || this.isTerminal(state.status)) return;
+      const db = await this.prisma.callSession.findUnique({ where: { id: callId } });
+      if (!db || this.isTerminal(db.status)) return;
+      await this.prisma.callSession.updateMany({
+        where: { id: callId, status: { notIn: [CallStatus.ENDED, CallStatus.CANCELLED] } },
+        data: { status: CallStatus.CONNECTED, connectedAt: db.connectedAt ?? new Date() },
       });
-    }
+      this.clearConnectTimer(callId);
+      await this.redis.setJson(this.callKey(callId), { ...state, status: CallStatus.CONNECTED });
+    });
   }
 
-  private async updateStatus(callId: string, status: CallStatus): Promise<void> {
-    await this.prisma.callSession.update({
-      where: { id: callId },
-      data: { status },
-    });
+  private isTerminal(status: CallStatus): boolean {
+    return status === CallStatus.ENDED || status === CallStatus.CANCELLED;
+  }
+
+  // Reuse the Redis lock helper so timeout, reconnect and hangup have one winner.
+  private async withCallLock<T>(callId: string, work: () => Promise<T>): Promise<T> {
+    const deadline = Date.now() + 5000;
+    do {
+      const release = await this.redis.acquireLock(`call:${callId}`, 30);
+      if (release) {
+        try { return await work(); } finally { await release(); }
+      }
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    } while (Date.now() < deadline);
+    throw new ApiException('CALL_BUSY', 'Call update in progress, try again', 409);
   }
 
   // ============================== Signaling relay ==============================
@@ -135,6 +155,7 @@ export class CallsService {
     payload: unknown,
   ): Promise<void> {
     const state = await this.verifyParticipant(callId, senderId);
+    if (this.isTerminal(state.status)) return;
     const peerId = state.participants.find((id) => id !== senderId);
     if (!peerId) throw new ApiException('CALL_INVALID', 'Call has no peer', 400);
 
@@ -164,28 +185,120 @@ export class CallsService {
     await this.finishCall(callId, reason, undefined, detail);
   }
 
-  async handleDisconnect(userId: string): Promise<void> {
+  private recoveryKey(callId: string, userId: string): string {
+    return `call:reconnecting:${callId}:${userId}`;
+  }
+
+  async handleDisconnect(userId: string, socketId?: string): Promise<void> {
     const p = await this.presence.get(userId);
     const callId = p?.currentCallId;
     if (!callId) return;
+    await this.withCallLock(callId, async () => {
+      const current = await this.presence.get(userId);
+      // A replacement socket may have authenticated while we waited for the lock.
+      if (current?.currentCallId !== callId || (socketId && current.socketId !== socketId)) return;
+      const state = await this.getCallState(callId);
+      if (!state || this.isTerminal(state.status)) return;
+      if (state.status !== CallStatus.CONNECTED) {
+        await this.finishCallLocked(callId,
+          state.status === CallStatus.CONNECTING ? CallEndReason.PEER_DISCONNECTED : CallEndReason.USER_DISCONNECTED,
+          userId, 'User disconnected before connection');
+        return;
+      }
+      const key = this.recoveryKey(callId, userId);
+      if (await this.redis.get(key)) return; // Repeated callbacks never extend grace.
+      const deadline = Date.now() + this.reconnectTimeoutSeconds * 1000;
+      await this.redis.setJson(key, { deadline }, this.reconnectTimeoutSeconds + 120);
+      this.scheduleRecoveryExpiry(callId, userId, key, deadline);
+      await Promise.all(state.participants.map((id) => this.events.sendToUser(id, 'CALL_RECONNECTING', {
+        callId, userId, reason: 'socket_disconnected',
+      })));
+    });
+  }
 
-    const state = await this.getCallState(callId);
-    const callStatus = state?.status;
-    if (!callStatus) return;
+  /**
+   * Arm the grace-period expiry for a reconnecting participant.
+   *
+   * The stored deadline is authoritative, so a retry can never extend it and
+   * the call still ends exactly `reconnectTimeoutSeconds` after the disconnect.
+   */
+  private scheduleRecoveryExpiry(callId: string, userId: string, key: string, deadline: number, attempt = 0): void {
+    // On the first attempt wait for the stored deadline; a retry waits for the
+    // call lock to clear instead.
+    const delay = attempt === 0 ? Math.max(deadline - Date.now(), 0) : attempt * this.recoveryLockRetryMs;
+    const timer = setTimeout(() => {
+      void this.expireRecovery(callId, userId, key, deadline, attempt);
+    }, delay);
+    timer.unref?.();
+    this.reconnectTimers.set(key, timer);
+  }
 
-    this.logger.log(`User ${userId} disconnected during call ${callId} (${callStatus})`);
-
-    if (callStatus === CallStatus.ENDED) return;
-
-    if (callStatus === CallStatus.MATCHED || callStatus === CallStatus.SIGNALING) {
-      // Never had WebRTC; cancel cleanly.
-      await this.finishCall(callId, CallEndReason.USER_DISCONNECTED, userId, 'User disconnected before connection');
-    } else if (callStatus === CallStatus.CONNECTED || callStatus === CallStatus.CONNECTING) {
-      await this.finishCall(callId, CallEndReason.PEER_DISCONNECTED, userId, 'Peer connection lost');
+  private async expireRecovery(callId: string, userId: string, key: string, deadline: number, attempt = 0): Promise<void> {
+    try {
+      await this.withCallLock(callId, async () => {
+        const pending = await this.redis.getJson<{ deadline: number }>(key);
+        // A cleared key means a reconnect or a manual hangup already won.
+        if (pending?.deadline !== deadline) return;
+        await this.finishCallLocked(callId, CallEndReason.PEER_DISCONNECTED, userId, 'Reconnect timed out');
+      });
+    } catch (error) {
+      // The call lock was unavailable (for example another instance died while
+      // holding it). Retry against the same deadline so an established call
+      // can never be left open, unless the call already ended another way.
+      if (attempt >= this.recoveryLockRetries || !this.reconnectTimers.has(key)) return;
+      this.logger.error(`Call recovery expiry retry ${attempt + 1} call=${callId} user=${userId}: ${error}`);
+      this.scheduleRecoveryExpiry(callId, userId, key, deadline, attempt + 1);
     }
   }
 
+  async handleReconnect(userId: string): Promise<void> {
+    const p = await this.presence.get(userId);
+    if (!p?.currentCallId) return;
+    const callId = p.currentCallId;
+    await this.withCallLock(callId, async () => {
+      const state = await this.getCallState(callId);
+      if (!state || this.isTerminal(state.status)) return;
+      const key = this.recoveryKey(callId, userId);
+      const pending = await this.redis.getJson<{ deadline: number }>(key);
+      if (pending && Date.now() >= pending.deadline) {
+        await this.finishCallLocked(callId, CallEndReason.PEER_DISCONNECTED, userId, 'Reconnect timed out');
+        return;
+      }
+      await this.clearRecovery(callId, userId);
+      if (state.status === CallStatus.CONNECTED) {
+        // Signaling is available again; clients still verify actual WebRTC connectivity.
+        await Promise.all(state.participants.map((id) => this.events.sendToUser(id, 'CALL_RECONNECTED', {
+          callId, userId, reason: 'socket_reconnected',
+        })));
+      }
+    });
+  }
+
+  async requestRecovery(callId: string, userId: string): Promise<void> {
+    const state = await this.verifyParticipant(callId, userId);
+    if (state.status !== CallStatus.CONNECTED) return;
+    const peer = state.participants.find((id) => id !== userId)!;
+    await this.events.sendToUser(peer, 'CALL_RECONNECTING', { callId, userId, reason: 'ice_restart' });
+  }
+
+  private async clearRecovery(callId: string, userId: string): Promise<void> {
+    const key = this.recoveryKey(callId, userId);
+    const timer = this.reconnectTimers.get(key);
+    if (timer) clearTimeout(timer);
+    this.reconnectTimers.delete(key);
+    await this.redis.del(key);
+  }
+
   private async finishCall(
+    callId: string,
+    reason: CallEndReason,
+    endedBy?: string,
+    detail?: string,
+  ): Promise<void> {
+    await this.withCallLock(callId, () => this.finishCallLocked(callId, reason, endedBy, detail));
+  }
+
+  private async finishCallLocked(
     callId: string,
     reason: CallEndReason,
     endedBy?: string,
@@ -204,8 +317,8 @@ export class CallsService {
       : null;
 
     // 1. Persist final state.
-    await this.prisma.callSession.update({
-      where: { id: callId },
+    const finished = await this.prisma.callSession.updateMany({
+      where: { id: callId, status: { notIn: [CallStatus.ENDED, CallStatus.CANCELLED] } },
       data: {
         status: CallStatus.ENDED,
         endedAt,
@@ -215,6 +328,9 @@ export class CallsService {
         endReasonDetail: detail,
       },
     });
+
+    if (finished.count === 0) return;
+    await Promise.all([db.userAId, db.userBId].map((id) => this.clearRecovery(callId, id)));
 
     await this.redis.setJson(this.callKey(callId), {
       callId,
@@ -281,6 +397,13 @@ export class CallsService {
       },
       peerId,
     };
+  }
+
+  onModuleDestroy(): void {
+    for (const timer of this.connectTimers.values()) clearTimeout(timer);
+    for (const timer of this.reconnectTimers.values()) clearTimeout(timer);
+    this.connectTimers.clear();
+    this.reconnectTimers.clear();
   }
 
   private clearConnectTimer(callId: string): void {

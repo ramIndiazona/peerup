@@ -1,6 +1,6 @@
 import 'package:equatable/equatable.dart';
 
-enum CallPhase { connecting, connected, failed, ended }
+enum CallPhase { connecting, connected, reconnecting, failed, ended }
 
 class CallState extends Equatable {
   const CallState({
