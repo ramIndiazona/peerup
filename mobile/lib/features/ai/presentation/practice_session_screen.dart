@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:peerup/features/ai/models/ai_character_state.dart';
 
 import '../../../core/config/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
@@ -160,12 +161,14 @@ class _PracticeSessionScreenState extends State<PracticeSessionScreen> {
                 // =========================
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
-                  child: AICharacterStage(
-                    character: state.character,
-                    state: stage,
-                    size: 190,
-                  ),
+                  child: AICharacterStage(isSpeaking: _speaking),
                 ),
+                //   AICharacterStage(
+                //     character: state.character,
+                //     state: stage,
+                //     size: 190,
+                //   ),
+                // ),
 
                 // =========================
                 // CONVERSATION

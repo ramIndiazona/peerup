@@ -31,8 +31,10 @@ import 'features/premium/subscription_repository.dart';
 import 'features/profile/bloc/profile_cubit.dart';
 import 'features/profile/profile_repository.dart';
 
-void main() {
+
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
 
   final tokens = TokenStorage();
   final tokenManager = TokenManager(storage: tokens);
