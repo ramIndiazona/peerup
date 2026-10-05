@@ -29,8 +29,6 @@ class AICatalogCubit extends Cubit<AICatalogState> {
 
   final AIRepository _repo;
 
-
-
   Future<void> load() async {
     emit(
       AICatalogState(

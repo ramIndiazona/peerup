@@ -10,6 +10,9 @@ import 'package:peerup/features/profile/profile_repository.dart';
 import '../../features/ai/presentation/ai_chat_screen.dart';
 import '../../features/ai/presentation/ai_feedback_screen.dart';
 import '../../features/ai/presentation/ai_modes_screen.dart';
+import '../../features/ai/presentation/practice_feedback_screen.dart';
+import '../../features/ai/presentation/practice_session_screen.dart';
+import '../../features/ai/presentation/practice_setup_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/register_screen.dart';
 import '../../features/auth/presentation/splash_screen.dart';
@@ -55,24 +58,18 @@ class AppRouter {
           return AppRoutes.splash;
         }
 
-     
-        if (status == AuthStatus.loggedOut) 
-        {
-  
+        if (status == AuthStatus.loggedOut) {
           if (location == AppRoutes.login || location == AppRoutes.register) {
             return null;
           }
           return AppRoutes.login;
         }
 
-        
         final needsOnboarding = auth.user?.onboardingCompleted != true;
 
-      
         if (location == AppRoutes.splash ||
             location == AppRoutes.login ||
-            location == AppRoutes.register) 
-            {
+            location == AppRoutes.register) {
           if (needsOnboarding) {
             return AppRoutes.onboarding;
           }
@@ -304,6 +301,40 @@ class AppRouter {
           name: 'aiChat',
           builder: (context, state) {
             return const AIChatScreen();
+          },
+        ),
+
+        // --------------------------------------------------
+        // PRACTICE SETUP
+        // --------------------------------------------------
+        GoRoute(
+          path: AppRoutes.practice,
+          name: 'practice',
+          builder: (context, state) {
+            return const PracticeSetupScreen();
+          },
+        ),
+
+        // --------------------------------------------------
+        // PRACTICE SESSION
+        // --------------------------------------------------
+        GoRoute(
+          path: AppRoutes.practiceSession,
+          name: 'practiceSession',
+          builder: (context, state) {
+            return const PracticeSessionScreen();
+          },
+        ),
+
+        // --------------------------------------------------
+        // PRACTICE FEEDBACK
+        // --------------------------------------------------
+        GoRoute(
+          path: AppRoutes.practiceFeedback,
+          name: 'practiceFeedback',
+          builder: (context, state) {
+            final sessionId = state.pathParameters['sessionId'] ?? '';
+            return PracticeFeedbackScreen(sessionId: sessionId);
           },
         ),
 

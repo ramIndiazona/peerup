@@ -22,4 +22,8 @@ class AppRoutes {
 
   static const String aiChat = '/ai/chat';
   static const String aiFeedback = '/ai/feedback/:sessionId';
+
+  static const String practice = '/practice';
+  static const String practiceSession = '/practice/session';
+  static const String practiceFeedback = '/practice/feedback/:sessionId';
 }

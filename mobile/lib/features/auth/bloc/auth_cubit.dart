@@ -73,8 +73,7 @@ class AuthCubit extends Cubit<AuthState> {
     }
   }
 
-  Future<void> login({required String email, required String password}) async 
-  {
+  Future<void> login({required String email, required String password}) async {
     final result = await _auth.login(email: email, password: password);
     emit(AuthState(status: AuthStatus.loggedIn, user: result.user));
   }
@@ -86,8 +85,7 @@ class AuthCubit extends Cubit<AuthState> {
     required String avatar,
     String? gender,
     String? englishLevel,
-  }) async 
-  {
+  }) async {
     final result = await _auth.register(
       email: email,
       password: password,

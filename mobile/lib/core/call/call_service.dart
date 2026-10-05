@@ -11,18 +11,10 @@ import '../realtime/realtime_socket_service.dart';
 import 'call_repository.dart';
 import 'webrtc_service.dart';
 
-enum CallServiceEventType {
-  connected,
-  reconnecting,
-  ended,
-  failed,
-}
+enum CallServiceEventType { connected, reconnecting, ended, failed }
 
 class CallServiceEvent {
-  const CallServiceEvent(
-    this.type, {
-    this.error,
-  });
+  const CallServiceEvent(this.type, {this.error});
 
   final CallServiceEventType type;
   final String? error;
@@ -59,9 +51,9 @@ class CallService {
     required RealtimeSocketService socket,
     required CallRepository repo,
     required WebRtcService webRtc,
-  })  : _socket = socket,
-        _repo = repo,
-        _webrtc = webRtc {
+  }) : _socket = socket,
+       _repo = repo,
+       _webrtc = webRtc {
     _sub = _socket.events.listen(_onEvent);
   }
 
@@ -88,6 +80,7 @@ class CallService {
   bool _reconnecting = false;
   bool _peerUnavailable = false;
   bool _recoveryBusy = false;
+
   /// The single reconnect grace period used by this service.
   ///
   /// The backend advertises its own value in `CONNECTED`
@@ -139,15 +132,11 @@ class CallService {
   }) async {
     if (_callActive && _callId == callId) return;
     if (_starting) {
-      debugPrint(
-        '[CALL] start ignored: already starting',
-      );
+      debugPrint('[CALL] start ignored: already starting');
       return;
     }
 
-    if (_callActive &&
-        _callId != null &&
-        _callId != callId) {
+    if (_callActive && _callId != null && _callId != callId) {
       debugPrint(
         '[CALL] another call is already active '
         'active=$_callId requested=$callId',
@@ -177,22 +166,16 @@ class CallService {
       await _socket.connect();
 
       if (!_socket.isAuthenticated) {
-        throw StateError(
-          'Realtime socket is not authenticated',
-        );
+        throw StateError('Realtime socket is not authenticated');
       }
 
       // ------------------------------------------------------------
       // 2. Best-effort call verification.
       // ------------------------------------------------------------
       try {
-        await _repo.getCall(
-          callId,
-        );
+        await _repo.getCall(callId);
 
-        debugPrint(
-          '[CALL] verified call=$callId',
-        );
+        debugPrint('[CALL] verified call=$callId');
       } on Exception catch (e) {
         debugPrint(
           '[CALL] getCall verification failed '
@@ -238,9 +221,7 @@ class CallService {
       // 4. Process signals that arrived before PeerConnection
       //    creation.
       // ------------------------------------------------------------
-      await _processPendingSignals(
-        callId,
-      );
+      await _processPendingSignals(callId);
 
       // ------------------------------------------------------------
       // 5. Caller creates the offer.
@@ -249,57 +230,36 @@ class CallService {
         final call = _webrtcCall;
 
         if (call == null) {
-          throw StateError(
-            'WebRTC call was not created',
-          );
+          throw StateError('WebRTC call was not created');
         }
 
-        final offer = await _webrtc.createOffer(
-          call,
-        );
+        final offer = await _webrtc.createOffer(call);
 
         debugPrint(
           '[CALL] sending CALL_OFFER '
           'callId=$callId',
         );
 
-        _socket.sendOffer(
-          callId,
-          offer,
-        );
+        _socket.sendOffer(callId, offer);
       }
 
       // ------------------------------------------------------------
       // 6. Process anything that may have arrived while the
       //    offer was being created.
       // ------------------------------------------------------------
-      await _processPendingSignals(
-        callId,
-      );
+      await _processPendingSignals(callId);
     } on Exception catch (e) {
-      debugPrint(
-        '[CALL] start failed: $e',
-      );
+      debugPrint('[CALL] start failed: $e');
 
       final activeCallId = _callId;
 
       if (activeCallId != null) {
-        _socket.reportCallFailed(
-          activeCallId,
-          'call start failed',
-        );
+        _socket.reportCallFailed(activeCallId, 'call start failed');
       }
 
-      _add(
-        CallServiceEvent(
-          CallServiceEventType.failed,
-          error: '$e',
-        ),
-      );
+      _add(CallServiceEvent(CallServiceEventType.failed, error: '$e'));
 
-      await end(
-        notifyBackend: false,
-      );
+      await end(notifyBackend: false);
     } finally {
       _starting = false;
     }
@@ -309,9 +269,7 @@ class CallService {
   // WEBRTC CONNECTION STATE
   // ---------------------------------------------------------------------------
 
-  void _onPeerState(
-    RTCPeerConnectionState state,
-  ) {
+  void _onPeerState(RTCPeerConnectionState state) {
     debugPrint(
       '[CALL] peer connection state=$state '
       'callId=$_callId',
@@ -326,13 +284,11 @@ class CallService {
       case RTCPeerConnectionState.RTCPeerConnectionStateFailed:
         if (_connected) {
           _beginRecovery();
-        } else if (state == RTCPeerConnectionState.RTCPeerConnectionStateFailed) {
+        } else if (state ==
+            RTCPeerConnectionState.RTCPeerConnectionStateFailed) {
           final id = _callId;
           if (id != null) {
-            _socket.reportCallFailed(
-              id,
-              'peer connection failed',
-            );
+            _socket.reportCallFailed(id, 'peer connection failed');
           }
           unawaited(end(notifyBackend: false));
         }
@@ -375,9 +331,7 @@ class CallService {
     final callId = _callId;
 
     if (callId != null) {
-      _socket.reportCallConnected(
-        callId,
-      );
+      _socket.reportCallConnected(callId);
 
       debugPrint(
         '[CALL] CALL_CONNECTED '
@@ -385,11 +339,7 @@ class CallService {
       );
     }
 
-    _add(
-      const CallServiceEvent(
-        CallServiceEventType.connected,
-      ),
-    );
+    _add(const CallServiceEvent(CallServiceEventType.connected));
   }
 
   void _beginRecovery({bool notifyPeer = true}) {
@@ -478,13 +428,10 @@ class CallService {
   /// Both states are required: `connected` alone can be reported while ICE
   /// consent checks are already failing, which would cancel recovery on a
   /// dead media path.
-  Future<bool> _isMediaHealthy(
-    ActiveWebRtcCall call,
-  ) async {
+  Future<bool> _isMediaHealthy(ActiveWebRtcCall call) async {
     final connection = await call.pc.getConnectionState();
 
-    if (connection !=
-        RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
+    if (connection != RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
       return false;
     }
 
@@ -505,7 +452,8 @@ class CallService {
     try {
       final details = await _repo.getCall(id);
       if (_callId != id || !_callActive) return;
-      if (details.call.status == CallStatus.ended || details.call.status == CallStatus.cancelled) {
+      if (details.call.status == CallStatus.ended ||
+          details.call.status == CallStatus.cancelled) {
         await end(notifyBackend: false);
         return;
       }
@@ -536,28 +484,20 @@ class CallService {
     final callId = _callId;
 
     if (callId != null && _callActive) {
-      debugPrint(
-        '[CALL] user hangup callId=$callId',
-      );
+      debugPrint('[CALL] user hangup callId=$callId');
 
       if (!_socket.isAuthenticated) _pendingHangups.add(callId);
-      _socket.endCall(
-        callId,
-      );
+      _socket.endCall(callId);
     }
 
-    await end(
-      notifyBackend: false,
-    );
+    await end(notifyBackend: false);
   }
 
   /// Finish the local WebRTC session.
   ///
   /// [notifyBackend] should be false when the backend has already received
   /// CALL_FAILED / CALL_ENDED.
-  Future<void> end({
-    bool notifyBackend = true,
-  }) async {
+  Future<void> end({bool notifyBackend = true}) async {
     final callId = _callId;
 
     if (!_callActive && _webrtcCall == null) {
@@ -569,9 +509,7 @@ class CallService {
     _connected = false;
     _remoteDescriptionSet = false;
 
-    debugPrint(
-      '[CALL] ending callId=$callId',
-    );
+    debugPrint('[CALL] ending callId=$callId');
 
     // ------------------------------------------------------------
     // Tell backend to end the call when required.
@@ -579,13 +517,9 @@ class CallService {
     if (notifyBackend && callId != null) {
       if (!_socket.isAuthenticated) _pendingHangups.add(callId);
       try {
-        _socket.endCall(
-          callId,
-        );
+        _socket.endCall(callId);
       } catch (e) {
-        debugPrint(
-          '[CALL] end signaling failed: $e',
-        );
+        debugPrint('[CALL] end signaling failed: $e');
       }
     }
 
@@ -598,13 +532,9 @@ class CallService {
 
     if (webrtc != null) {
       try {
-        await _webrtc.dispose(
-          webrtc,
-        );
+        await _webrtc.dispose(webrtc);
       } catch (e) {
-        debugPrint(
-          '[CALL] WebRTC dispose failed: $e',
-        );
+        debugPrint('[CALL] WebRTC dispose failed: $e');
       }
     }
 
@@ -612,23 +542,15 @@ class CallService {
     // Remove only buffers belonging to this call.
     // ------------------------------------------------------------
     if (callId != null) {
-      _pendingSignals.remove(
-        callId,
-      );
+      _pendingSignals.remove(callId);
 
-      _pendingIceCandidates.remove(
-        callId,
-      );
+      _pendingIceCandidates.remove(callId);
     }
 
     _callId = null;
     _role = null;
 
-    _add(
-      const CallServiceEvent(
-        CallServiceEventType.ended,
-      ),
-    );
+    _add(const CallServiceEvent(CallServiceEventType.ended));
   }
 
   /// Dispose local WebRTC resources without sending lifecycle events.
@@ -646,26 +568,18 @@ class CallService {
 
     if (webrtc != null) {
       try {
-        await _webrtc.dispose(
-          webrtc,
-        );
+        await _webrtc.dispose(webrtc);
       } catch (e) {
-        debugPrint(
-          '[CALL] teardown failed: $e',
-        );
+        debugPrint('[CALL] teardown failed: $e');
       }
     }
 
     final callId = _callId;
 
     if (callId != null) {
-      _pendingSignals.remove(
-        callId,
-      );
+      _pendingSignals.remove(callId);
 
-      _pendingIceCandidates.remove(
-        callId,
-      );
+      _pendingIceCandidates.remove(callId);
     }
 
     _callId = null;
@@ -676,9 +590,7 @@ class CallService {
   // LOCAL ICE
   // ---------------------------------------------------------------------------
 
-  void _sendIce(
-    Map<String, dynamic> ice,
-  ) {
+  void _sendIce(Map<String, dynamic> ice) {
     final callId = _callId;
 
     if (callId == null || !_callActive) {
@@ -691,19 +603,14 @@ class CallService {
     );
 
     if (_reconnecting) _recoveryIce.add(ice);
-    _socket.sendIce(
-      callId,
-      ice,
-    );
+    _socket.sendIce(callId, ice);
   }
 
   // ---------------------------------------------------------------------------
   // REALTIME EVENTS
   // ---------------------------------------------------------------------------
 
-  void _onEvent(
-    RealtimeEvent event,
-  ) {
+  void _onEvent(RealtimeEvent event) {
     switch (event.type) {
       case RealtimeEventType.disconnected:
         _beginRecovery(notifyPeer: false);
@@ -732,9 +639,7 @@ class CallService {
       case RealtimeEventType.callOffer:
       case RealtimeEventType.callAnswer:
       case RealtimeEventType.iceCandidate:
-        _handleSignalingEvent(
-          event,
-        );
+        _handleSignalingEvent(event);
         break;
 
       case RealtimeEventType.callConnected:
@@ -753,25 +658,15 @@ class CallService {
             'callId=${event.callId}',
           );
 
-          unawaited(
-            end(
-              notifyBackend: false,
-            ),
-          );
+          unawaited(end(notifyBackend: false));
         }
         break;
 
       case RealtimeEventType.error:
         if (event.rawErrorCode == 'MULTIPLE_DEVICE') {
-          debugPrint(
-            '[CALL] MULTIPLE_DEVICE',
-          );
+          debugPrint('[CALL] MULTIPLE_DEVICE');
 
-          unawaited(
-            end(
-              notifyBackend: false,
-            ),
-          );
+          unawaited(end(notifyBackend: false));
         }
         break;
 
@@ -784,12 +679,8 @@ class CallService {
   // SIGNALING BUFFER
   // ---------------------------------------------------------------------------
 
-  void _handleSignalingEvent(
-    RealtimeEvent event,
-  ) {
-    final data = SignalingData.fromJson(
-      event.data,
-    );
+  void _handleSignalingEvent(RealtimeEvent event) {
+    final data = SignalingData.fromJson(event.data);
 
     final callId = data.callId;
 
@@ -812,14 +703,9 @@ class CallService {
         'active=$_callId',
       );
 
-      final list = _pendingSignals.putIfAbsent(
-        callId,
-        () => <RealtimeEvent>[],
-      );
+      final list = _pendingSignals.putIfAbsent(callId, () => <RealtimeEvent>[]);
 
-      list.add(
-        event,
-      );
+      list.add(event);
 
       return;
     }
@@ -848,12 +734,8 @@ class CallService {
     );
   }
 
-  Future<void> _processPendingSignals(
-    String callId,
-  ) async {
-    final pending = _pendingSignals.remove(
-      callId,
-    );
+  Future<void> _processPendingSignals(String callId) async {
+    final pending = _pendingSignals.remove(callId);
 
     if (pending == null || pending.isEmpty) {
       return;
@@ -869,18 +751,12 @@ class CallService {
         return;
       }
 
-      await _processSignalingEvent(
-        event,
-      );
+      await _processSignalingEvent(event);
     }
   }
 
-  Future<void> _processSignalingEvent(
-    RealtimeEvent event,
-  ) async {
-    final data = SignalingData.fromJson(
-      event.data,
-    );
+  Future<void> _processSignalingEvent(RealtimeEvent event) async {
+    final data = SignalingData.fromJson(event.data);
 
     if (data.callId != _callId) {
       debugPrint(
@@ -903,28 +779,20 @@ class CallService {
       return;
     }
 
-    final payload =
-        (data.data as Map).cast<String, dynamic>();
+    final payload = (data.data as Map).cast<String, dynamic>();
 
     try {
       switch (event.type) {
         case RealtimeEventType.callOffer:
-          await _handleOffer(
-            payload,
-          );
+          await _handleOffer(payload);
           break;
 
         case RealtimeEventType.callAnswer:
-          await _handleAnswer(
-            payload,
-          );
+          await _handleAnswer(payload);
           break;
 
         case RealtimeEventType.iceCandidate:
-          await _handleIce(
-            data.callId,
-            payload,
-          );
+          await _handleIce(data.callId, payload);
           break;
 
         default:
@@ -943,15 +811,10 @@ class CallService {
       final callId = _callId;
 
       if (callId != null) {
-        _socket.reportCallFailed(
-          callId,
-          'signaling processing failed',
-        );
+        _socket.reportCallFailed(callId, 'signaling processing failed');
       }
 
-      await end(
-        notifyBackend: false,
-      );
+      await end(notifyBackend: false);
     }
   }
 
@@ -959,9 +822,7 @@ class CallService {
   // OFFER
   // ---------------------------------------------------------------------------
 
-  Future<void> _handleOffer(
-    Map<String, dynamic> offer,
-  ) async {
+  Future<void> _handleOffer(Map<String, dynamic> offer) async {
     final webrtc = _webrtcCall;
     final callId = _callId;
 
@@ -971,9 +832,7 @@ class CallService {
 
     // Only callee should process an incoming offer.
     if (_role != 'callee') {
-      debugPrint(
-        '[CALL] ignoring offer because role=$_role',
-      );
+      debugPrint('[CALL] ignoring offer because role=$_role');
       return;
     }
 
@@ -986,30 +845,25 @@ class CallService {
     if (restarting) {
       if (_answeredRestartSdp == offer['sdp'] && _restartAnswer != null) {
         _socket.sendAnswer(callId, _restartAnswer!);
-        for (final ice in _recoveryIce) { _socket.sendIce(callId, ice); }
+        for (final ice in _recoveryIce) {
+          _socket.sendIce(callId, ice);
+        }
         return;
       }
       _beginRecovery(notifyPeer: false);
       _remoteDescriptionSet = false;
       _recoveryIce.clear();
     }
-    await _webrtc.acceptOffer(
-      webrtc,
-      offer,
-    );
+    await _webrtc.acceptOffer(webrtc, offer);
 
     _remoteDescriptionSet = true;
 
     // ------------------------------------------------------------
     // ICE candidates that arrived before the offer can now be added.
     // ------------------------------------------------------------
-    await _flushPendingIce(
-      callId,
-    );
+    await _flushPendingIce(callId);
 
-    final answer = await _webrtc.createAnswer(
-      webrtc,
-    );
+    final answer = await _webrtc.createAnswer(webrtc);
 
     debugPrint(
       '[CALL] sending CALL_ANSWER '
@@ -1021,19 +875,14 @@ class CallService {
       _answeredRestartSdp = offer['sdp'] as String?;
       _restartAnswer = answer;
     }
-    _socket.sendAnswer(
-      callId,
-      answer,
-    );
+    _socket.sendAnswer(callId, answer);
   }
 
   // ---------------------------------------------------------------------------
   // ANSWER
   // ---------------------------------------------------------------------------
 
-  Future<void> _handleAnswer(
-    Map<String, dynamic> answer,
-  ) async {
+  Future<void> _handleAnswer(Map<String, dynamic> answer) async {
     final webrtc = _webrtcCall;
     final callId = _callId;
 
@@ -1043,9 +892,7 @@ class CallService {
 
     // Only caller should process answer.
     if (_role != 'caller') {
-      debugPrint(
-        '[CALL] ignoring answer because role=$_role',
-      );
+      debugPrint('[CALL] ignoring answer because role=$_role');
       return;
     }
 
@@ -1055,28 +902,23 @@ class CallService {
     );
 
     // A repeated answer after a successful retry must not fail a stable call.
-    if (_connected && await webrtc.pc.getSignalingState() == RTCSignalingState.RTCSignalingStateStable) return;
-    await _webrtc.acceptAnswer(
-      webrtc,
-      answer,
-    );
+    if (_connected &&
+        await webrtc.pc.getSignalingState() ==
+            RTCSignalingState.RTCSignalingStateStable)
+      return;
+    await _webrtc.acceptAnswer(webrtc, answer);
     if (_webrtcCall != webrtc || !_callActive) return;
 
     _remoteDescriptionSet = true;
 
-    await _flushPendingIce(
-      callId,
-    );
+    await _flushPendingIce(callId);
   }
 
   // ---------------------------------------------------------------------------
   // REMOTE ICE
   // ---------------------------------------------------------------------------
 
-  Future<void> _handleIce(
-    String callId,
-    Map<String, dynamic> ice,
-  ) async {
+  Future<void> _handleIce(String callId, Map<String, dynamic> ice) async {
     final webrtc = _webrtcCall;
 
     if (webrtc == null) {
@@ -1113,26 +955,19 @@ class CallService {
         () => <Map<String, dynamic>>[],
       );
 
-      list.add(
-        ice,
-      );
+      list.add(ice);
 
       return;
     }
 
-    await _webrtc.addIceCandidate(
-      webrtc,
-      ice,
-    );
+    await _webrtc.addIceCandidate(webrtc, ice);
   }
 
   // ---------------------------------------------------------------------------
   // FLUSH QUEUED ICE
   // ---------------------------------------------------------------------------
 
-  Future<void> _flushPendingIce(
-    String callId,
-  ) async {
+  Future<void> _flushPendingIce(String callId) async {
     final webrtc = _webrtcCall;
 
     if (webrtc == null ||
@@ -1142,9 +977,7 @@ class CallService {
       return;
     }
 
-    final candidates = _pendingIceCandidates.remove(
-      callId,
-    );
+    final candidates = _pendingIceCandidates.remove(callId);
 
     if (candidates == null || candidates.isEmpty) {
       return;
@@ -1161,14 +994,9 @@ class CallService {
       }
 
       try {
-        await _webrtc.addIceCandidate(
-          webrtc,
-          candidate,
-        );
+        await _webrtc.addIceCandidate(webrtc, candidate);
       } catch (e) {
-        debugPrint(
-          '[CALL] queued ICE failed: $e',
-        );
+        debugPrint('[CALL] queued ICE failed: $e');
       }
     }
   }
@@ -1177,13 +1005,9 @@ class CallService {
   // EVENTS
   // ---------------------------------------------------------------------------
 
-  void _add(
-    CallServiceEvent event,
-  ) {
+  void _add(CallServiceEvent event) {
     if (!_events.isClosed) {
-      _events.add(
-        event,
-      );
+      _events.add(event);
     }
   }
 

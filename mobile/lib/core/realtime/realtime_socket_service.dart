@@ -33,9 +33,7 @@ import 'realtime_event.dart';
 /// Authentication is considered complete only after the backend sends
 /// `CONNECTED`.
 class RealtimeSocketService {
-  RealtimeSocketService({
-    required TokenManager tokens,
-  }) : _tokens = tokens;
+  RealtimeSocketService({required TokenManager tokens}) : _tokens = tokens;
 
   final TokenManager _tokens;
 
@@ -44,8 +42,7 @@ class RealtimeSocketService {
   final StreamController<RealtimeEvent> _events =
       StreamController<RealtimeEvent>.broadcast();
 
-  final StreamController<RealtimeConnectionState>
-      _connectionController =
+  final StreamController<RealtimeConnectionState> _connectionController =
       StreamController<RealtimeConnectionState>.broadcast();
 
   Timer? _heartbeat;
@@ -64,11 +61,9 @@ class RealtimeSocketService {
   /// it wait for the complete authentication timeout.
   Completer<void>? _authenticationCompleter;
 
-  static const Duration _heartbeatInterval =
-      Duration(seconds: 15);
+  static const Duration _heartbeatInterval = Duration(seconds: 15);
 
-  static const Duration _authenticationTimeout =
-      Duration(seconds: 10);
+  static const Duration _authenticationTimeout = Duration(seconds: 10);
 
   static const List<Duration> _backoffDelays = [
     Duration(seconds: 1),
@@ -85,19 +80,16 @@ class RealtimeSocketService {
 
   Stream<RealtimeEvent> get events => _events.stream;
 
-  Stream<RealtimeConnectionState>
-      get connectionStateStream =>
-          _connectionController.stream;
+  Stream<RealtimeConnectionState> get connectionStateStream =>
+      _connectionController.stream;
 
   // ============================================================
   // CONNECTION STATE
   // ============================================================
 
-  RealtimeConnectionState _connection =
-      RealtimeConnectionState.disconnected;
+  RealtimeConnectionState _connection = RealtimeConnectionState.disconnected;
 
-  RealtimeConnectionState get connectionState =>
-      _connection;
+  RealtimeConnectionState get connectionState => _connection;
 
   /// True ONLY after:
   ///
@@ -106,12 +98,10 @@ class RealtimeSocketService {
   /// 3. NestJS has emitted CONNECTED.
   bool get isAuthenticated =>
       _socket?.connected == true &&
-      _connection ==
-          RealtimeConnectionState.connected;
+      _connection == RealtimeConnectionState.connected;
 
   /// Existing services use this name.
-  bool get isConnected =>
-      isAuthenticated;
+  bool get isConnected => isAuthenticated;
 
   // ============================================================
   // CONNECT
@@ -145,10 +135,7 @@ class RealtimeSocketService {
     try {
       await future;
     } finally {
-      if (identical(
-        _connecting,
-        future,
-      )) {
+      if (identical(_connecting, future)) {
         _connecting = null;
       }
     }
@@ -162,34 +149,25 @@ class RealtimeSocketService {
     final existing = _socket;
 
     if (existing != null) {
-      if (existing.connected &&
-          isAuthenticated) {
+      if (existing.connected && isAuthenticated) {
         return;
       }
 
       _teardownSocket();
     }
 
-    _setConnection(
-      RealtimeConnectionState.connecting,
-    );
+    _setConnection(RealtimeConnectionState.connecting);
 
     // ----------------------------------------------------------
     // GET FRESH TOKEN
     // ----------------------------------------------------------
 
-    final token =
-        await _tokens.getValidAccessToken();
+    final token = await _tokens.getValidAccessToken();
 
-    if (token == null ||
-        token.isEmpty) {
-      debugPrint(
-        '[WS] no valid token available',
-      );
+    if (token == null || token.isEmpty) {
+      debugPrint('[WS] no valid token available');
 
-      _setConnection(
-        RealtimeConnectionState.disconnected,
-      );
+      _setConnection(RealtimeConnectionState.disconnected);
 
       return;
     }
@@ -198,33 +176,23 @@ class RealtimeSocketService {
     // AUTHENTICATION COMPLETER
     // ----------------------------------------------------------
 
-    final authenticated =
-        Completer<void>();
+    final authenticated = Completer<void>();
 
-    _authenticationCompleter =
-        authenticated;
+    _authenticationCompleter = authenticated;
 
     // ----------------------------------------------------------
     // CREATE SOCKET
     // ----------------------------------------------------------
 
-    debugPrint(
-      '[WS] creating authenticated socket',
-    );
+    debugPrint('[WS] creating authenticated socket');
 
     final socket = io.io(
       AppConfig.wsUrl,
       io.OptionBuilder()
-          .setTransports([
-            'websocket',
-          ])
+          .setTransports(['websocket'])
           .disableAutoConnect()
-          .setPath(
-            AppConfig.wsPath,
-          )
-          .setAuth({
-            'token': token,
-          })
+          .setPath(AppConfig.wsPath)
+          .setAuth({'token': token})
           .disableReconnection()
           .build(),
     );
@@ -236,10 +204,7 @@ class RealtimeSocketService {
     // ----------------------------------------------------------
 
     bool isCurrentSocket() {
-      return identical(
-        _socket,
-        socket,
-      );
+      return identical(_socket, socket);
     }
 
     // ==========================================================
@@ -248,9 +213,7 @@ class RealtimeSocketService {
 
     socket.onConnect((_) {
       if (!isCurrentSocket()) {
-        debugPrint(
-          '[WS] ignoring stale transport connect',
-        );
+        debugPrint('[WS] ignoring stale transport connect');
 
         return;
       }
@@ -271,39 +234,25 @@ class RealtimeSocketService {
     // SERVER AUTHENTICATED
     // ==========================================================
 
-    socket.on(
-      'CONNECTED',
-      (data) {
-        if (!isCurrentSocket()) {
-          debugPrint(
-            '[WS] ignoring stale CONNECTED event',
-          );
+    socket.on('CONNECTED', (data) {
+      if (!isCurrentSocket()) {
+        debugPrint('[WS] ignoring stale CONNECTED event');
 
-          return;
-        }
+        return;
+      }
 
-        debugPrint(
-          '[WS] server authenticated',
-        );
+      debugPrint('[WS] server authenticated');
 
-        _reconnectAttempt = 0;
+      _reconnectAttempt = 0;
 
-        _setConnection(
-          RealtimeConnectionState.connected,
-        );
+      _setConnection(RealtimeConnectionState.connected);
 
-        _startHeartbeat();
+      _startHeartbeat();
 
-        _push(
-          _typed(
-            RealtimeEventType.connected,
-            data,
-          ),
-        );
+      _push(_typed(RealtimeEventType.connected, data));
 
-        _completeAuthentication();
-      },
-    );
+      _completeAuthentication();
+    });
 
     // ==========================================================
     // DISCONNECTED
@@ -311,16 +260,12 @@ class RealtimeSocketService {
 
     socket.onDisconnect((reason) {
       if (!isCurrentSocket()) {
-        debugPrint(
-          '[WS] ignoring stale socket disconnect',
-        );
+        debugPrint('[WS] ignoring stale socket disconnect');
 
         return;
       }
 
-      debugPrint(
-        '[WS] disconnected reason=$reason',
-      );
+      debugPrint('[WS] disconnected reason=$reason');
 
       _heartbeat?.cancel();
       _heartbeat = null;
@@ -334,25 +279,13 @@ class RealtimeSocketService {
       }
 
       // This socket is no longer usable.
-      if (identical(
-        _socket,
-        socket,
-      )) {
+      if (identical(_socket, socket)) {
         _socket = null;
       }
 
-      _setConnection(
-        RealtimeConnectionState.disconnected,
-      );
+      _setConnection(RealtimeConnectionState.disconnected);
 
-      _push(
-        RealtimeEvent(
-          RealtimeEventType.disconnected,
-          {
-            'reason': reason,
-          },
-        ),
-      );
+      _push(RealtimeEvent(RealtimeEventType.disconnected, {'reason': reason}));
 
       _scheduleReconnect();
     });
@@ -366,12 +299,9 @@ class RealtimeSocketService {
         return;
       }
 
-      debugPrint(
-        '[WS] connect error: $data',
-      );
+      debugPrint('[WS] connect error: $data');
 
-      final text =
-          '$data'.toLowerCase();
+      final text = '$data'.toLowerCase();
 
       final authRejected =
           text.contains('unauthorized') ||
@@ -380,11 +310,7 @@ class RealtimeSocketService {
           text.contains('token');
 
       if (authRejected) {
-        unawaited(
-          _onAuthRejected(
-            socket,
-          ),
-        );
+        unawaited(_onAuthRejected(socket));
 
         return;
       }
@@ -394,14 +320,10 @@ class RealtimeSocketService {
       _heartbeat?.cancel();
       _heartbeat = null;
 
-      _setConnection(
-        RealtimeConnectionState.disconnected,
-      );
+      _setConnection(RealtimeConnectionState.disconnected);
 
       if (!_manualDisconnect) {
-        _teardownSpecificSocket(
-          socket,
-        );
+        _teardownSpecificSocket(socket);
 
         _scheduleReconnect();
       }
@@ -416,357 +338,216 @@ class RealtimeSocketService {
         return;
       }
 
-      debugPrint(
-        '[WS] socket error: $data',
-      );
+      debugPrint('[WS] socket error: $data');
 
-      _push(
-        RealtimeEvent(
-          RealtimeEventType.error,
-          {
-            'message': '$data',
-          },
-        ),
-      );
+      _push(RealtimeEvent(RealtimeEventType.error, {'message': '$data'}));
     });
 
     // ==========================================================
     // HEARTBEAT ACK
     // ==========================================================
 
-    socket.on(
-      'HEARTBEAT_ACK',
-      (data) {
-        if (!isCurrentSocket()) {
-          return;
-        }
+    socket.on('HEARTBEAT_ACK', (data) {
+      if (!isCurrentSocket()) {
+        return;
+      }
 
-        _push(
-          _typed(
-            RealtimeEventType.heartbeatAck,
-            data,
-          ),
-        );
-      },
-    );
+      _push(_typed(RealtimeEventType.heartbeatAck, data));
+    });
 
     // ==========================================================
     // LIVE COUNT
     // ==========================================================
 
-    socket.on(
-      'LIVE_COUNT_UPDATED',
-      (data) {
-        if (!isCurrentSocket()) {
-          return;
-        }
+    socket.on('LIVE_COUNT_UPDATED', (data) {
+      if (!isCurrentSocket()) {
+        return;
+      }
 
-        _push(
-          _typed(
-            RealtimeEventType.liveCount,
-            data,
-          ),
-        );
-      },
-    );
+      _push(_typed(RealtimeEventType.liveCount, data));
+    });
 
     // ==========================================================
     // LIVE USERS
     // ==========================================================
 
-    socket.on(
-      'LIVE_USERS',
-      (data) {
-        if (!isCurrentSocket()) {
-          return;
-        }
+    socket.on('LIVE_USERS', (data) {
+      if (!isCurrentSocket()) {
+        return;
+      }
 
-        _push(
-          _typed(
-            RealtimeEventType.liveUsers,
-            data,
-          ),
-        );
-      },
-    );
+      _push(_typed(RealtimeEventType.liveUsers, data));
+    });
 
     // ==========================================================
     // LIVE STARTED
     // ==========================================================
 
-    socket.on(
-      'LIVE_STARTED',
-      (data) {
-        if (!isCurrentSocket()) {
-          return;
-        }
+    socket.on('LIVE_STARTED', (data) {
+      if (!isCurrentSocket()) {
+        return;
+      }
 
-        _push(
-          _typed(
-            RealtimeEventType.liveStarted,
-            data,
-          ),
-        );
-      },
-    );
+      _push(_typed(RealtimeEventType.liveStarted, data));
+    });
 
     // ==========================================================
     // LIVE STOPPED
     // ==========================================================
 
-    socket.on(
-      'LIVE_STOPPED',
-      (data) {
-        if (!isCurrentSocket()) {
-          return;
-        }
+    socket.on('LIVE_STOPPED', (data) {
+      if (!isCurrentSocket()) {
+        return;
+      }
 
-        _push(
-          _typed(
-            RealtimeEventType.liveStopped,
-            data,
-          ),
-        );
-      },
-    );
+      _push(_typed(RealtimeEventType.liveStopped, data));
+    });
 
     // ==========================================================
     // MATCH FOUND
     // ==========================================================
 
-    socket.on(
-      'MATCH_FOUND',
-      (data) {
-        if (!isCurrentSocket()) {
-          return;
-        }
+    socket.on('MATCH_FOUND', (data) {
+      if (!isCurrentSocket()) {
+        return;
+      }
 
-        debugPrint(
-          '[WS] MATCH_FOUND',
-        );
+      debugPrint('[WS] MATCH_FOUND');
 
-        _push(
-          _typed(
-            RealtimeEventType.matchFound,
-            data,
-          ),
-        );
-      },
-    );
+      _push(_typed(RealtimeEventType.matchFound, data));
+    });
 
     // ==========================================================
     // MATCH SEARCHING
     // ==========================================================
 
-    socket.on(
-      'MATCH_SEARCHING',
-      (data) {
-        if (!isCurrentSocket()) {
-          return;
-        }
+    socket.on('MATCH_SEARCHING', (data) {
+      if (!isCurrentSocket()) {
+        return;
+      }
 
-        _push(
-          _typed(
-            RealtimeEventType.matchSearching,
-            data,
-          ),
-        );
-      },
-    );
+      _push(_typed(RealtimeEventType.matchSearching, data));
+    });
 
     // ==========================================================
     // MATCH CANCELLED
     // ==========================================================
 
-    socket.on(
-      'MATCH_CANCELLED',
-      (data) {
-        if (!isCurrentSocket()) {
-          return;
-        }
+    socket.on('MATCH_CANCELLED', (data) {
+      if (!isCurrentSocket()) {
+        return;
+      }
 
-        _push(
-          _typed(
-            RealtimeEventType.matchCancelled,
-            data,
-          ),
-        );
-      },
-    );
+      _push(_typed(RealtimeEventType.matchCancelled, data));
+    });
 
     // ==========================================================
     // MATCH TIMEOUT
     // ==========================================================
 
-    socket.on(
-      'MATCH_TIMEOUT',
-      (data) {
-        if (!isCurrentSocket()) {
-          return;
-        }
+    socket.on('MATCH_TIMEOUT', (data) {
+      if (!isCurrentSocket()) {
+        return;
+      }
 
-        _push(
-          _typed(
-            RealtimeEventType.matchTimeout,
-            data,
-          ),
-        );
-      },
-    );
+      _push(_typed(RealtimeEventType.matchTimeout, data));
+    });
 
     // ==========================================================
     // CALL OFFER
     // ==========================================================
 
-    socket.on(
-      'CALL_OFFER',
-      (data) {
-        if (!isCurrentSocket()) {
-          return;
-        }
+    socket.on('CALL_OFFER', (data) {
+      if (!isCurrentSocket()) {
+        return;
+      }
 
-        debugPrint(
-          '[WS] CALL_OFFER received',
-        );
+      debugPrint('[WS] CALL_OFFER received');
 
-        _push(
-          _typed(
-            RealtimeEventType.callOffer,
-            data,
-          ),
-        );
-      },
-    );
+      _push(_typed(RealtimeEventType.callOffer, data));
+    });
 
     // ==========================================================
     // CALL ANSWER
     // ==========================================================
 
-    socket.on(
-      'CALL_ANSWER',
-      (data) {
-        if (!isCurrentSocket()) {
-          return;
-        }
+    socket.on('CALL_ANSWER', (data) {
+      if (!isCurrentSocket()) {
+        return;
+      }
 
-        debugPrint(
-          '[WS] CALL_ANSWER received',
-        );
+      debugPrint('[WS] CALL_ANSWER received');
 
-        _push(
-          _typed(
-            RealtimeEventType.callAnswer,
-            data,
-          ),
-        );
-      },
-    );
+      _push(_typed(RealtimeEventType.callAnswer, data));
+    });
 
     // ==========================================================
     // ICE CANDIDATE
     // ==========================================================
 
-    socket.on(
-      'ICE_CANDIDATE',
-      (data) {
-        if (!isCurrentSocket()) {
-          return;
-        }
+    socket.on('ICE_CANDIDATE', (data) {
+      if (!isCurrentSocket()) {
+        return;
+      }
 
-        debugPrint(
-          '[WS] ICE_CANDIDATE received',
-        );
+      debugPrint('[WS] ICE_CANDIDATE received');
 
-        _push(
-          _typed(
-            RealtimeEventType.iceCandidate,
-            data,
-          ),
-        );
-      },
-    );
+      _push(_typed(RealtimeEventType.iceCandidate, data));
+    });
 
     // ==========================================================
     // CALL CONNECTED
     // ==========================================================
 
-    for (final entry in {
-      'CALL_RECONNECTING': RealtimeEventType.callReconnecting,
-      'CALL_RECONNECTED': RealtimeEventType.callReconnected,
-    }.entries) {
+    for (final entry
+        in {
+          'CALL_RECONNECTING': RealtimeEventType.callReconnecting,
+          'CALL_RECONNECTED': RealtimeEventType.callReconnected,
+        }.entries) {
       socket.on(entry.key, (data) {
         if (isCurrentSocket()) _push(_typed(entry.value, data));
       });
     }
 
-    socket.on(
-      'CALL_CONNECTED',
-      (data) {
-        if (!isCurrentSocket()) {
-          return;
-        }
+    socket.on('CALL_CONNECTED', (data) {
+      if (!isCurrentSocket()) {
+        return;
+      }
 
-        _push(
-          _typed(
-            RealtimeEventType.callConnected,
-            data,
-          ),
-        );
-      },
-    );
+      _push(_typed(RealtimeEventType.callConnected, data));
+    });
 
     // ==========================================================
     // CALL ENDED
     // ==========================================================
 
-    socket.on(
-      'CALL_ENDED',
-      (data) {
-        if (!isCurrentSocket()) {
-          return;
-        }
+    socket.on('CALL_ENDED', (data) {
+      if (!isCurrentSocket()) {
+        return;
+      }
 
-        _push(
-          _typed(
-            RealtimeEventType.callEnded,
-            data,
-          ),
-        );
-      },
-    );
+      _push(_typed(RealtimeEventType.callEnded, data));
+    });
 
     // ==========================================================
     // SERVER ERROR
     // ==========================================================
 
-    socket.on(
-      'ERROR',
-      (data) {
-        if (!isCurrentSocket()) {
-          return;
-        }
+    socket.on('ERROR', (data) {
+      if (!isCurrentSocket()) {
+        return;
+      }
 
-        debugPrint(
-          '[WS] server ERROR: $data',
-        );
+      debugPrint('[WS] server ERROR: $data');
 
-        final event = _typed(
-          RealtimeEventType.error,
-          data,
-        );
+      final event = _typed(RealtimeEventType.error, data);
 
-        _push(event);
+      _push(event);
 
-        if (event.rawErrorCode ==
-            'UNAUTHORIZED') {
-          unawaited(
-            _onAuthRejected(
-              socket,
-            ),
-          );
-        }
-      },
-    );
+      if (event.rawErrorCode == 'UNAUTHORIZED') {
+        unawaited(_onAuthRejected(socket));
+      }
+    });
 
     // ==========================================================
     // START SOCKET
@@ -779,39 +560,28 @@ class RealtimeSocketService {
     // ==========================================================
 
     try {
-      await authenticated.future.timeout(
-        _authenticationTimeout,
-      );
+      await authenticated.future.timeout(_authenticationTimeout);
     } on TimeoutException {
       if (!isCurrentSocket()) {
         return;
       }
 
-      debugPrint(
-        '[WS] server authentication timeout',
-      );
+      debugPrint('[WS] server authentication timeout');
 
       _completeAuthentication();
 
       _heartbeat?.cancel();
       _heartbeat = null;
 
-      _teardownSpecificSocket(
-        socket,
-      );
+      _teardownSpecificSocket(socket);
 
       if (!_manualDisconnect) {
-        _setConnection(
-          RealtimeConnectionState.disconnected,
-        );
+        _setConnection(RealtimeConnectionState.disconnected);
 
         _scheduleReconnect();
       }
     } finally {
-      if (identical(
-        _authenticationCompleter,
-        authenticated,
-      )) {
+      if (identical(_authenticationCompleter, authenticated)) {
         _authenticationCompleter = null;
       }
     }
@@ -822,8 +592,7 @@ class RealtimeSocketService {
   // ============================================================
 
   void _completeAuthentication() {
-    final completer =
-        _authenticationCompleter;
+    final completer = _authenticationCompleter;
 
     if (completer == null) {
       return;
@@ -838,18 +607,13 @@ class RealtimeSocketService {
   // AUTH REJECTED
   // ============================================================
 
-  Future<void> _onAuthRejected(
-    io.Socket rejectedSocket,
-  ) async {
+  Future<void> _onAuthRejected(io.Socket rejectedSocket) async {
     if (_manualDisconnect) {
       return;
     }
 
     // Ignore an old socket.
-    if (!identical(
-      _socket,
-      rejectedSocket,
-    )) {
+    if (!identical(_socket, rejectedSocket)) {
       return;
     }
 
@@ -858,9 +622,7 @@ class RealtimeSocketService {
       '- refreshing token',
     );
 
-    _setConnection(
-      RealtimeConnectionState.unauthorized,
-    );
+    _setConnection(RealtimeConnectionState.unauthorized);
 
     _heartbeat?.cancel();
     _heartbeat = null;
@@ -882,10 +644,7 @@ class RealtimeSocketService {
     // as the current socket.
     // ----------------------------------------------------------
 
-    if (identical(
-      _socket,
-      rejectedSocket,
-    )) {
+    if (identical(_socket, rejectedSocket)) {
       _socket = null;
     }
 
@@ -899,34 +658,24 @@ class RealtimeSocketService {
     // ----------------------------------------------------------
 
     try {
-      final freshToken =
-          await _tokens.forceRefresh();
+      final freshToken = await _tokens.forceRefresh();
 
-      if (freshToken == null ||
-          freshToken.isEmpty) {
+      if (freshToken == null || freshToken.isEmpty) {
         debugPrint(
           '[WS] token refresh failed '
           '- session unavailable',
         );
 
-        _setConnection(
-          RealtimeConnectionState.disconnected,
-        );
+        _setConnection(RealtimeConnectionState.disconnected);
 
         return;
       }
 
-      debugPrint(
-        '[WS] token refreshed successfully',
-      );
+      debugPrint('[WS] token refreshed successfully');
     } catch (e) {
-      debugPrint(
-        '[WS] force refresh failed: $e',
-      );
+      debugPrint('[WS] force refresh failed: $e');
 
-      _setConnection(
-        RealtimeConnectionState.disconnected,
-      );
+      _setConnection(RealtimeConnectionState.disconnected);
 
       return;
     }
@@ -941,20 +690,15 @@ class RealtimeSocketService {
 
     _reconnectTimer?.cancel();
 
-    _reconnectTimer = Timer(
-      _nextBackoff(),
-      () {
-        _reconnectTimer = null;
+    _reconnectTimer = Timer(_nextBackoff(), () {
+      _reconnectTimer = null;
 
-        if (_manualDisconnect) {
-          return;
-        }
+      if (_manualDisconnect) {
+        return;
+      }
 
-        unawaited(
-          connect(),
-        );
-      },
-    );
+      unawaited(connect());
+    });
   }
 
   // ============================================================
@@ -974,38 +718,29 @@ class RealtimeSocketService {
       return;
     }
 
-    final delay =
-        _nextBackoff();
+    final delay = _nextBackoff();
 
     debugPrint(
       '[WS] reconnect scheduled '
       'in ${delay.inSeconds}s',
     );
 
-    _reconnectTimer = Timer(
-      delay,
-      () {
-        _reconnectTimer = null;
+    _reconnectTimer = Timer(delay, () {
+      _reconnectTimer = null;
 
-        if (_manualDisconnect) {
-          return;
-        }
+      if (_manualDisconnect) {
+        return;
+      }
 
-        _setConnection(
-          RealtimeConnectionState.reconnecting,
-        );
+      _setConnection(RealtimeConnectionState.reconnecting);
 
-        unawaited(
-          connect(),
-        );
-      },
-    );
+      unawaited(connect());
+    });
   }
 
   Duration _nextBackoff() {
     final index =
-        _reconnectAttempt <
-                _backoffDelays.length
+        _reconnectAttempt < _backoffDelays.length
             ? _reconnectAttempt
             : _backoffDelays.length - 1;
 
@@ -1021,18 +756,13 @@ class RealtimeSocketService {
   void _startHeartbeat() {
     _heartbeat?.cancel();
 
-    debugPrint(
-      '[WS] heartbeat started',
-    );
+    debugPrint('[WS] heartbeat started');
 
-    _heartbeat = Timer.periodic(
-      _heartbeatInterval,
-      (_) {
-        if (isAuthenticated) {
-          heartbeat();
-        }
-      },
-    );
+    _heartbeat = Timer.periodic(_heartbeatInterval, (_) {
+      if (isAuthenticated) {
+        heartbeat();
+      }
+    });
   }
 
   // ============================================================
@@ -1052,16 +782,9 @@ class RealtimeSocketService {
 
     _teardownSocket();
 
-    _setConnection(
-      RealtimeConnectionState.disconnected,
-    );
+    _setConnection(RealtimeConnectionState.disconnected);
 
-    _push(
-      RealtimeEvent(
-        RealtimeEventType.disconnected,
-        {},
-      ),
-    );
+    _push(RealtimeEvent(RealtimeEventType.disconnected, {}));
   }
 
   void _teardownSocket() {
@@ -1078,13 +801,8 @@ class RealtimeSocketService {
     } catch (_) {}
   }
 
-  void _teardownSpecificSocket(
-    io.Socket socket,
-  ) {
-    if (identical(
-      _socket,
-      socket,
-    )) {
+  void _teardownSpecificSocket(io.Socket socket) {
+    if (identical(_socket, socket)) {
       _socket = null;
     }
 
@@ -1098,17 +816,13 @@ class RealtimeSocketService {
   // EVENTS
   // ============================================================
 
-  void _push(
-    RealtimeEvent event,
-  ) {
+  void _push(RealtimeEvent event) {
     if (!_events.isClosed) {
       _events.add(event);
     }
   }
 
-  void _setConnection(
-    RealtimeConnectionState state,
-  ) {
+  void _setConnection(RealtimeConnectionState state) {
     if (_connection == state) {
       return;
     }
@@ -1116,34 +830,22 @@ class RealtimeSocketService {
     _connection = state;
 
     if (!_connectionController.isClosed) {
-      _connectionController.add(
-        state,
-      );
+      _connectionController.add(state);
     }
   }
 
-  RealtimeEvent _typed(
-    RealtimeEventType type,
-    dynamic data,
-  ) {
+  RealtimeEvent _typed(RealtimeEventType type, dynamic data) {
     final Map<String, dynamic> map;
 
     if (data is Map<String, dynamic>) {
       map = data;
     } else if (data is Map) {
-      map = Map<String, dynamic>.from(
-        data,
-      );
+      map = Map<String, dynamic>.from(data);
     } else {
       map = <String, dynamic>{};
     }
 
-    return RealtimeEvent(
-      type,
-      map,
-      callId:
-          map['callId'] as String?,
-    );
+    return RealtimeEvent(type, map, callId: map['callId'] as String?);
   }
 
   // ============================================================
@@ -1160,14 +862,9 @@ class RealtimeSocketService {
       return;
     }
 
-    debugPrint(
-      '[LIVE] LIVE_START',
-    );
+    debugPrint('[LIVE] LIVE_START');
 
-    _emit(
-      'LIVE_START',
-      {},
-    );
+    _emit('LIVE_START', {});
   }
 
   void stopLive() {
@@ -1180,14 +877,9 @@ class RealtimeSocketService {
       return;
     }
 
-    debugPrint(
-      '[LIVE] LIVE_STOP',
-    );
+    debugPrint('[LIVE] LIVE_STOP');
 
-    _emit(
-      'LIVE_STOP',
-      {},
-    );
+    _emit('LIVE_STOP', {});
   }
 
   void heartbeat() {
@@ -1195,19 +887,14 @@ class RealtimeSocketService {
       return;
     }
 
-    _emit(
-      'HEARTBEAT',
-      {},
-    );
+    _emit('HEARTBEAT', {});
   }
 
   // ============================================================
   // MATCHMAKING
   // ============================================================
 
-  void sendStartMatch(
-    Map<String, dynamic> filters,
-  ) {
+  void sendStartMatch(Map<String, dynamic> filters) {
     if (!isAuthenticated) {
       debugPrint(
         '[MATCH] START_MATCH ignored '
@@ -1217,16 +904,9 @@ class RealtimeSocketService {
       return;
     }
 
-    debugPrint(
-      '[MATCH] START_MATCH',
-    );
+    debugPrint('[MATCH] START_MATCH');
 
-    _emit(
-      'START_MATCH',
-      {
-        'filters': filters,
-      },
-    );
+    _emit('START_MATCH', {'filters': filters});
   }
 
   void cancelMatch() {
@@ -1239,24 +919,16 @@ class RealtimeSocketService {
       return;
     }
 
-    debugPrint(
-      '[MATCH] START_MATCH_CANCEL',
-    );
+    debugPrint('[MATCH] START_MATCH_CANCEL');
 
-    _emit(
-      'START_MATCH_CANCEL',
-      {},
-    );
+    _emit('START_MATCH_CANCEL', {});
   }
 
   // ============================================================
   // CALL SIGNALING
   // ============================================================
 
-  void sendOffer(
-    String callId,
-    dynamic sdp,
-  ) {
+  void sendOffer(String callId, dynamic sdp) {
     if (!isAuthenticated) {
       debugPrint(
         '[CALL] CALL_OFFER skipped '
@@ -1271,19 +943,10 @@ class RealtimeSocketService {
       'callId=$callId',
     );
 
-    _emit(
-      'CALL_OFFER',
-      {
-        'callId': callId,
-        'data': sdp,
-      },
-    );
+    _emit('CALL_OFFER', {'callId': callId, 'data': sdp});
   }
 
-  void sendAnswer(
-    String callId,
-    dynamic sdp,
-  ) {
+  void sendAnswer(String callId, dynamic sdp) {
     if (!isAuthenticated) {
       debugPrint(
         '[CALL] CALL_ANSWER skipped '
@@ -1298,19 +961,10 @@ class RealtimeSocketService {
       'callId=$callId',
     );
 
-    _emit(
-      'CALL_ANSWER',
-      {
-        'callId': callId,
-        'data': sdp,
-      },
-    );
+    _emit('CALL_ANSWER', {'callId': callId, 'data': sdp});
   }
 
-  void sendIce(
-    String callId,
-    dynamic candidate,
-  ) {
+  void sendIce(String callId, dynamic candidate) {
     if (!isAuthenticated) {
       debugPrint(
         '[CALL] ICE_CANDIDATE skipped '
@@ -1320,22 +974,14 @@ class RealtimeSocketService {
       return;
     }
 
-    _emit(
-      'ICE_CANDIDATE',
-      {
-        'callId': callId,
-        'data': candidate,
-      },
-    );
+    _emit('ICE_CANDIDATE', {'callId': callId, 'data': candidate});
   }
 
   void requestCallRecovery(String callId) {
     if (isAuthenticated) _emit('CALL_RECONNECTING', {'callId': callId});
   }
 
-  void reportCallConnected(
-    String callId,
-  ) {
+  void reportCallConnected(String callId) {
     if (!isAuthenticated) {
       debugPrint(
         '[CALL] CALL_CONNECTED skipped '
@@ -1345,17 +991,10 @@ class RealtimeSocketService {
       return;
     }
 
-    _emit(
-      'CALL_CONNECTED',
-      {
-        'callId': callId,
-      },
-    );
+    _emit('CALL_CONNECTED', {'callId': callId});
   }
 
-  void endCall(
-    String callId,
-  ) {
+  void endCall(String callId) {
     if (!isAuthenticated) {
       debugPrint(
         '[CALL] END_CALL skipped '
@@ -1365,18 +1004,10 @@ class RealtimeSocketService {
       return;
     }
 
-    _emit(
-      'END_CALL',
-      {
-        'callId': callId,
-      },
-    );
+    _emit('END_CALL', {'callId': callId});
   }
 
-  void reportCallFailed(
-    String callId, [
-    String? reason,
-  ]) {
+  void reportCallFailed(String callId, [String? reason]) {
     if (!isAuthenticated) {
       debugPrint(
         '[CALL] CALL_FAILED skipped '
@@ -1386,28 +1017,17 @@ class RealtimeSocketService {
       return;
     }
 
-    _emit(
-      'CALL_FAILED',
-      {
-        'callId': callId,
-        'reason': reason,
-      },
-    );
+    _emit('CALL_FAILED', {'callId': callId, 'reason': reason});
   }
 
   // ============================================================
   // EMIT
   // ============================================================
 
-  void _emit(
-    String event,
-    dynamic data,
-  ) {
+  void _emit(String event, dynamic data) {
     final socket = _socket;
 
-    if (socket == null ||
-        !socket.connected ||
-        !isAuthenticated) {
+    if (socket == null || !socket.connected || !isAuthenticated) {
       debugPrint(
         '[WS] emit skipped '
         'event=$event '
@@ -1417,10 +1037,7 @@ class RealtimeSocketService {
       return;
     }
 
-    socket.emit(
-      event,
-      data,
-    );
+    socket.emit(event, data);
   }
 
   // ============================================================

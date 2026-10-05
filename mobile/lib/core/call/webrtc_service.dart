@@ -145,44 +145,29 @@ class WebRtcService {
         },
     ];
 
-    return {
-      'iceServers': servers,
-      'sdpSemantics': 'unified-plan',
-    };
+    return {'iceServers': servers, 'sdpSemantics': 'unified-plan'};
   }
 
   Future<ActiveWebRtcCall> createCall({
-    required void Function(
-      Map<String, dynamic> candidate,
-    ) onSendIceCandidate,
-    required void Function(
-      MediaStream remoteStream,
-    ) onRemoteStream,
-    required void Function(
-      RTCPeerConnectionState state,
-    ) onState,
+    required void Function(Map<String, dynamic> candidate) onSendIceCandidate,
+    required void Function(MediaStream remoteStream) onRemoteStream,
+    required void Function(RTCPeerConnectionState state) onState,
   }) async {
     final local = await navigator.mediaDevices.getUserMedia({
       'audio': true,
       'video': false,
     });
 
-    final pc = await createPeerConnection(
-      _config(),
-    );
+    final pc = await createPeerConnection(_config());
 
     for (final track in local.getAudioTracks()) {
-      await pc.addTrack(
-        track,
-        local,
-      );
+      await pc.addTrack(track, local);
     }
 
     pc.onIceCandidate = (candidate) {
       final candidateValue = candidate.candidate;
 
-      if (candidateValue == null ||
-          candidateValue.isEmpty) {
+      if (candidateValue == null || candidateValue.isEmpty) {
         return;
       }
 
@@ -195,18 +180,13 @@ class WebRtcService {
 
     pc.onTrack = (event) {
       if (event.streams.isNotEmpty) {
-        onRemoteStream(
-          event.streams.first,
-        );
+        onRemoteStream(event.streams.first);
       }
     };
 
     pc.onConnectionState = onState;
 
-    return ActiveWebRtcCall(
-      pc: pc,
-      localStream: local,
-    );
+    return ActiveWebRtcCall(pc: pc, localStream: local);
   }
 
   Future<Map<String, dynamic>> createOffer(
@@ -219,9 +199,7 @@ class WebRtcService {
       'offerToReceiveVideo': 0,
     });
 
-    await call.pc.setLocalDescription(
-      offer,
-    );
+    await call.pc.setLocalDescription(offer);
 
     return offer.toMap();
   }
@@ -233,9 +211,7 @@ class WebRtcService {
     final sdp = offer['sdp'];
 
     if (sdp is! String || sdp.isEmpty) {
-      throw StateError(
-        'Invalid WebRTC offer SDP',
-      );
+      throw StateError('Invalid WebRTC offer SDP');
     }
 
     final type = offer['type'];
@@ -243,24 +219,18 @@ class WebRtcService {
     await call.pc.setRemoteDescription(
       RTCSessionDescription(
         sdp,
-        type is String && type.isNotEmpty
-            ? type
-            : 'offer',
+        type is String && type.isNotEmpty ? type : 'offer',
       ),
     );
   }
 
-  Future<Map<String, dynamic>> createAnswer(
-    ActiveWebRtcCall call,
-  ) async {
+  Future<Map<String, dynamic>> createAnswer(ActiveWebRtcCall call) async {
     final answer = await call.pc.createAnswer({
       'offerToReceiveAudio': 1,
       'offerToReceiveVideo': 0,
     });
 
-    await call.pc.setLocalDescription(
-      answer,
-    );
+    await call.pc.setLocalDescription(answer);
 
     return answer.toMap();
   }
@@ -272,9 +242,7 @@ class WebRtcService {
     final sdp = answer['sdp'];
 
     if (sdp is! String || sdp.isEmpty) {
-      throw StateError(
-        'Invalid WebRTC answer SDP',
-      );
+      throw StateError('Invalid WebRTC answer SDP');
     }
 
     final type = answer['type'];
@@ -282,9 +250,7 @@ class WebRtcService {
     await call.pc.setRemoteDescription(
       RTCSessionDescription(
         sdp,
-        type is String && type.isNotEmpty
-            ? type
-            : 'answer',
+        type is String && type.isNotEmpty ? type : 'answer',
       ),
     );
   }
@@ -295,8 +261,7 @@ class WebRtcService {
   ) async {
     final candidateValue = candidate['candidate'];
 
-    if (candidateValue is! String ||
-        candidateValue.isEmpty) {
+    if (candidateValue is! String || candidateValue.isEmpty) {
       return;
     }
 
@@ -319,9 +284,7 @@ class WebRtcService {
     );
   }
 
-  Future<void> dispose(
-    ActiveWebRtcCall call,
-  ) async {
+  Future<void> dispose(ActiveWebRtcCall call) async {
     try {
       await call.pc.close();
     } catch (_) {}

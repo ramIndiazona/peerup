@@ -37,9 +37,7 @@ class _PeerUpAppState extends State<PeerUpApp> {
       child: BlocListener<AuthCubit, AuthState>(
         listener: (context, state) {
           debugPrint('AUTH CHANGED: ${state.status}');
-          if (state.status == AuthStatus.loggedOut) 
-          {
-           
+          if (state.status == AuthStatus.loggedOut) {
             context.read<RealtimeSocketService>().disconnect();
             context.read<LiveCubit>().reset();
             context.read<MatchmakingCubit>().reset();

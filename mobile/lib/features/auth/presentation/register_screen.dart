@@ -40,8 +40,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Future<void> _submit() async {
     if (_busy) return;
-    if (!_choosingAvatar) 
-    {
+    if (!_choosingAvatar) {
       if (!_formKey.currentState!.validate()) return;
       setState(() => _choosingAvatar = true);
       return;

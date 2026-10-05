@@ -1,4 +1,3 @@
-
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -619,12 +618,7 @@ class LivePresenceService {
     // authoritative live session. The backend also removes/corrects presence
     // on socket disconnect. Keep the local snapshot aligned until reconnect
     // recovery restores LIVE_START.
-    _emit(
-      _snapshot.copyWith(
-        connected: false,
-        selfLive: false,
-      ),
-    );
+    _emit(_snapshot.copyWith(connected: false, selfLive: false));
 
     final completer = _connectedCompleter;
     if (completer != null && !completer.isCompleted) {

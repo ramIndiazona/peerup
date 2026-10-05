@@ -122,7 +122,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 alignment: Alignment.bottomRight,
                 children: [
                   if (profile != null)
-                    UserAvatar(url: profile.avatar, name: profile.name, radius: 44),
+                    UserAvatar(
+                      url: profile.avatar,
+                      name: profile.name,
+                      radius: 44,
+                    ),
                   Container(
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
