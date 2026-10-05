@@ -21,6 +21,7 @@ dependencies:
   speech_to_text: ^7.0.0
   flutter_tts:
   google_fonts: ^6.2.1
+  rive: ^0.14.11
 
 dev_dependencies:
   flutter_test:
@@ -32,4 +33,5 @@ flutter:
   assets:
     - assets/
     - assets/avatars/
+    - assets/characters/grace.riv
    
