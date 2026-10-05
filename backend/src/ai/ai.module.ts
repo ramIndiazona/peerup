@@ -14,6 +14,7 @@ import { AISessionsService } from './ai-sessions.service';
 import { AICharactersService } from './ai-characters.service';
 import { AIFeedbackService } from './ai-feedback.service';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
+import { OllamaProviderService } from './providers/ollama.provider';
 
 @Module({
   imports: [SubscriptionsModule],
@@ -21,15 +22,47 @@ import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
   providers: [
     AISessionsService,
     AICharactersService,
+    OllamaProviderService,
     AIFeedbackService,
+    // {
+    //   provide: LLM_SERVICE,
+    //   inject: [ConfigService],
+    //   useFactory: (config: ConfigService) => {
+    //     const provider = config.get<string>('ai.provider', 'openai');
+    //     if (provider === 'local' || !config.get<string>('ai.openaiApiKey')) {
+    //       return new LocalLlmService(config);
+    //     }
+    //     return new OpenAiProviderService(config);
+    //   },
+    // },
     {
       provide: LLM_SERVICE,
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => {
-        const provider = config.get<string>('ai.provider', 'openai');
-        if (provider === 'local' || !config.get<string>('ai.openaiApiKey')) {
+
+      inject: [
+        ConfigService,
+        OllamaProviderService,
+      ],
+
+      useFactory: (
+        config: ConfigService,
+        ollama: OllamaProviderService,
+      ) => {
+        const provider = config.get<string>(
+          'ai.provider',
+          'openai',
+        );
+
+        if (provider === 'ollama') {
+          return ollama;
+        }
+
+        if (
+          provider === 'local' ||
+          !config.get<string>('ai.openaiApiKey')
+        ) {
           return new LocalLlmService(config);
         }
+
         return new OpenAiProviderService(config);
       },
     },
@@ -52,4 +85,4 @@ import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
   ],
   exports: [AISessionsService, AICharactersService],
 })
-export class AIModule {}
+export class AIModule { }
