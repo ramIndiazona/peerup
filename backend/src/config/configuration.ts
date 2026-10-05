@@ -51,6 +51,12 @@ export default () => ({
     ttsProvider: process.env.TTS_PROVIDER || 'openai',
     moderationEnabled: process.env.AI_MODERATION_ENABLED === 'true',
     feedbackModel: process.env.AI_FEEDBACK_MODEL || 'gpt-4o-mini',
+
+    ollamaUrl:
+      process.env.OLLAMA_URL || 'http://localhost:11434',
+    ollamaModel:
+      process.env.OLLAMA_MODEL || 'gemma4:e2b',
+      
   },
   firebase: {
     projectId: process.env.FIREBASE_PROJECT_ID,
