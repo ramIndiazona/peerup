@@ -1,0 +1,21 @@
+{
+  "name": "AvatarUnity.Tests.EditMode",
+  "rootNamespace": "AvatarUnity.Tests",
+  "references": [
+    "AvatarUnity",
+    "UnityEngine.TestRunner",
+    "UnityEditor.TestRunner",
+    "nunit.framework.dll"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

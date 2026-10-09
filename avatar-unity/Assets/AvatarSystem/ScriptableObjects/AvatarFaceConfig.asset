@@ -1,0 +1,215 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5cdd5fa9a81d3c88f7937ba3d56a98ed, type: 3}
+  m_Name: AvatarFaceConfig
+  m_EditorClassIdentifier: 
+  rendererKeys:
+  - FaceMesh
+  - BodyMesh
+  channelMappings:
+  - channel: 1
+    rendererKey: FaceMesh
+    blendShapeName: jawOpen
+    defaultWeight: 0
+    maxWeight: 1
+    applySmoothing: 1
+  - channel: 2
+    rendererKey: FaceMesh
+    blendShapeName: mouthClose
+    defaultWeight: 0
+    maxWeight: 1
+    applySmoothing: 1
+  - channel: 4
+    rendererKey: FaceMesh
+    blendShapeName: mouthPucker
+    defaultWeight: 0
+    maxWeight: 1
+    applySmoothing: 1
+  - channel: 3
+    rendererKey: FaceMesh
+    blendShapeName: mouthFunnel
+    defaultWeight: 0
+    maxWeight: 1
+    applySmoothing: 1
+  - channel: 5
+    rendererKey: FaceMesh
+    blendShapeName: mouthSmileLeft
+    defaultWeight: 0
+    maxWeight: 1
+    applySmoothing: 1
+  - channel: 7
+    rendererKey: FaceMesh
+    blendShapeName: mouthSmileLeft
+    defaultWeight: 0
+    maxWeight: 1
+    applySmoothing: 1
+  - channel: 8
+    rendererKey: FaceMesh
+    blendShapeName: mouthSmileRight
+    defaultWeight: 0
+    maxWeight: 1
+    applySmoothing: 1
+  - channel: 9
+    rendererKey: FaceMesh
+    blendShapeName: mouthFrownLeft
+    defaultWeight: 0
+    maxWeight: 1
+    applySmoothing: 1
+  - channel: 10
+    rendererKey: FaceMesh
+    blendShapeName: mouthFrownRight
+    defaultWeight: 0
+    maxWeight: 1
+    applySmoothing: 1
+  - channel: 41
+    rendererKey: FaceMesh
+    blendShapeName: eyeBlinkLeft
+    defaultWeight: 0
+    maxWeight: 1
+    applySmoothing: 1
+  - channel: 42
+    rendererKey: FaceMesh
+    blendShapeName: eyeBlinkRight
+    defaultWeight: 0
+    maxWeight: 1
+    applySmoothing: 1
+  - channel: 43
+    rendererKey: FaceMesh
+    blendShapeName: eyeSquintLeft
+    defaultWeight: 0
+    maxWeight: 1
+    applySmoothing: 1
+  - channel: 44
+    rendererKey: FaceMesh
+    blendShapeName: eyeSquintRight
+    defaultWeight: 0
+    maxWeight: 1
+    applySmoothing: 1
+  - channel: 44
+    rendererKey: FaceMesh
+    blendShapeName: browUpLeft
+    defaultWeight: 0
+    maxWeight: 1
+    applySmoothing: 1
+  - channel: 44
+    rendererKey: FaceMesh
+    blendShapeName: browUpRight
+    defaultWeight: 0
+    maxWeight: 1
+    applySmoothing: 1
+  - channel: 44
+    rendererKey: FaceMesh
+    blendShapeName: browDownLeft
+    defaultWeight: 0
+    maxWeight: 1
+    applySmoothing: 1
+  - channel: 44
+    rendererKey: FaceMesh
+    blendShapeName: browDownRight
+    defaultWeight: 0
+    maxWeight: 1
+    applySmoothing: 1
+  - channel: 44
+    rendererKey: FaceMesh
+    blendShapeName: cheekRaiseLeft
+    defaultWeight: 0
+    maxWeight: 1
+    applySmoothing: 1
+  - channel: 44
+    rendererKey: FaceMesh
+    blendShapeName: cheekRaiseRight
+    defaultWeight: 0
+    maxWeight: 1
+    applySmoothing: 1
+  emotionMappings:
+  - emotion: 1
+    channels:
+    - channel: 7
+      weight: 0.85
+    - channel: 8
+      weight: 0.85
+    - channel: 8
+      weight: 0.5
+    - channel: 8
+      weight: 0.5
+    - channel: 43
+      weight: 0.25
+    - channel: 44
+      weight: 0.25
+  - emotion: 2
+    channels:
+    - channel: 7
+      weight: 0.55
+    - channel: 8
+      weight: 0.55
+    - channel: 8
+      weight: 0.5
+    - channel: 8
+      weight: 0.5
+  - emotion: 3
+    channels:
+    - channel: 0
+      weight: 0.6
+    - channel: 0
+      weight: 0.6
+    - channel: 7
+      weight: 0.2
+    - channel: 8
+      weight: 0.2
+  - emotion: 4
+    channels:
+    - channel: 0
+      weight: 0.4
+    - channel: 0
+      weight: 0.4
+    - channel: 43
+      weight: 0.3
+    - channel: 44
+      weight: 0.3
+    - channel: 9
+      weight: 0.15
+    - channel: 10
+      weight: 0.15
+  - emotion: 5
+    channels:
+    - channel: 7
+      weight: 0.95
+    - channel: 8
+      weight: 0.95
+    - channel: 8
+      weight: 0.7
+    - channel: 8
+      weight: 0.7
+    - channel: 8
+      weight: 0.6
+    - channel: 8
+      weight: 0.6
+  - emotion: 6
+    channels:
+    - channel: 0
+      weight: 0.6
+    - channel: 0
+      weight: 0.5
+    - channel: 9
+      weight: 0.4
+    - channel: 10
+      weight: 0.4
+  - emotion: 7
+    channels:
+    - channel: 0
+      weight: 0.85
+    - channel: 0
+      weight: 0.85
+    - channel: 7
+      weight: 0.15
+    - channel: 8
+      weight: 0.15

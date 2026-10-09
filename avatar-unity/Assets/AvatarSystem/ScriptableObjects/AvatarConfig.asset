@@ -1,0 +1,61 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ca14d54a20e0b5850c64c2d5e1a82307, type: 3}
+  m_Name: AvatarConfig
+  m_EditorClassIdentifier: 
+  displayName: AI Tutor Avatar
+  fpsLow: 30
+  fpsMedium: 60
+  fpsHigh: 60
+  qualityLevel: 1
+  maxYaw: 25
+  maxPitch: 18
+  headWeight: 0.6
+  eyeWeight: 0.9
+  lookSmoothSpeed: 6
+  lookTargetDistance: 1.8
+  microLookDeviation: 0.12
+  noiseAmplitude: 0.1
+  blinkMinInterval: 1.6
+  blinkMaxInterval: 6
+  blinkCloseDuration: 0.1
+  blinkHoldDuration: 0.06
+  blinkOpenDuration: 0.14
+  idleBreathingEnabled: 1
+  breathingAmplitude: 0.18
+  breathingFrequency: 0.55
+  breathingCyclePhase: 0
+  idleMicroMotionEnabled: 1
+  microMotionAmplitude: 0.12
+  useIdleAnimations: 1
+  idleMotionSpeakingScale: 0.3
+  audioSampleRate: 24000
+  audioChannels: 1
+  audioBufferThresholdSeconds: 0.12
+  audioRingBufferSeconds: 4
+  audioUnderrunToleranceSeconds: 0.5
+  visemeLookaheadMs: 40
+  lipSmoothTime: 0.045
+  mouthResetDuration: 0.12
+  audioDrivenSensitivity: 1
+  audioDrivenNoiseGate: 0.015
+  audioDrivenAttack: 0.015
+  audioDrivenRelease: 0.08
+  gestureCooldownSeconds: 1
+  gestureMaxRepeat: 3
+  blockGesturesWhileSpeaking: 0
+  pauseOnBackground: 1
+  logToScreen: 0
+  enableDebugControls: 0
+  logLevel: 3
+  faceConfig: {fileID: 11400000, guid: e11f124f0f9ff494cb94a566161c5fe2, type: 2}
+  visemeConfig: {fileID: 11400000, guid: 0aa08fa160165451db5bc2097439e938, type: 2}
