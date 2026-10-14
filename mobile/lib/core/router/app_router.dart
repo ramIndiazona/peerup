@@ -6,6 +6,7 @@ import 'package:peerup/features/ai/bloc/ai_feedback_cubit.dart';
 import 'package:peerup/features/auth/bloc/auth_cubit.dart';
 import 'package:peerup/features/profile/bloc/public_profile_cubit.dart';
 import 'package:peerup/features/profile/profile_repository.dart';
+import 'package:peerup/features/tongue/tongue_twister_practice_page.dart';
 
 import '../../features/ai/presentation/ai_chat_screen.dart';
 import '../../features/ai/presentation/ai_feedback_screen.dart';
@@ -55,24 +56,18 @@ class AppRouter {
           return AppRoutes.splash;
         }
 
-     
-        if (status == AuthStatus.loggedOut) 
-        {
-  
+        if (status == AuthStatus.loggedOut) {
           if (location == AppRoutes.login || location == AppRoutes.register) {
             return null;
           }
           return AppRoutes.login;
         }
 
-        
         final needsOnboarding = auth.user?.onboardingCompleted != true;
 
-      
         if (location == AppRoutes.splash ||
             location == AppRoutes.login ||
-            location == AppRoutes.register) 
-            {
+            location == AppRoutes.register) {
           if (needsOnboarding) {
             return AppRoutes.onboarding;
           }
@@ -171,13 +166,25 @@ class AppRouter {
             // ------------------------------------------------
             // AI
             // ------------------------------------------------
+            // StatefulShellBranch(
+            //   routes: [
+            //     GoRoute(
+            //       path: AppRoutes.homeAi,
+            //       name: 'homeAi',
+            //       builder: (context, state) {
+            //         return const AIModesScreen();
+            //       },
+            //     ),
+            //   ],
+            // ),
+
             StatefulShellBranch(
               routes: [
                 GoRoute(
-                  path: AppRoutes.homeAi,
-                  name: 'homeAi',
+                  path: AppRoutes.tongueTwisters,
+                  name: 'tongueTwisters',
                   builder: (context, state) {
-                    return const AIModesScreen();
+                    return const TongueTwisterPracticePage();
                   },
                 ),
               ],

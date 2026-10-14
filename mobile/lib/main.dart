@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:peerup/features/tongue/data/tongue_twister_repository.dart';
 
 import 'app.dart';
 import 'core/auth/auth_repository.dart';
@@ -30,6 +31,9 @@ import 'features/premium/bloc/premium_cubit.dart';
 import 'features/premium/subscription_repository.dart';
 import 'features/profile/bloc/profile_cubit.dart';
 import 'features/profile/profile_repository.dart';
+import 'features/tongue/bloc/tongue_twister_bloc.dart';
+import 'features/tongue/bloc/tongue_twister_event.dart';
+import 'features/tongue/bloc/tongue_twister_state.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -70,6 +74,7 @@ void main() {
   final matchmakingCubit = MatchmakingCubit(service: matchmakingService);
   final callCubit = CallCubit(call: callService);
   final router = AppRouter(authCubit: authCubit).router;
+  final tongueTwisterRepository = TongueTwisterRepository(apiClient);
 
   runApp(
     MultiRepositoryProvider(
@@ -85,6 +90,9 @@ void main() {
         RepositoryProvider<AIRepository>.value(value: aiRepository),
         RepositoryProvider<LivePresenceRepository>.value(
           value: livePresenceRepository,
+        ),
+        RepositoryProvider<TongueTwisterRepository>.value(
+          value: tongueTwisterRepository,
         ),
         RepositoryProvider<LivePresenceService>.value(
           value: livePresenceService,
@@ -119,6 +127,12 @@ void main() {
           ),
           BlocProvider(
             create: (_) => PremiumCubit(repo: subscriptionRepository),
+          ),
+          BlocProvider<TongueTwisterBloc>(
+            create:
+                (context) =>
+                    TongueTwisterBloc(context.read<TongueTwisterRepository>())
+                      ..add(FetchTongueTwisters()),
           ),
         ],
         child: PeerUpApp(

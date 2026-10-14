@@ -5,6 +5,7 @@ class AppRoutes {
   static const String login = '/login';
   static const String register = '/register';
   static const String onboarding = '/onboarding';
+  static const String tongueTwisters = '/tongue-twisters';
 
   static const String homeMatch = '/home/match';
   static const String homeAi = '/home/ai';

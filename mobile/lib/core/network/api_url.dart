@@ -9,6 +9,8 @@ class APIURL {
   static const String usersMe = 'users/me';
   static const String usersInterests = 'users/interests';
   static String userPublic(String userId) => 'users/$userId';
+    static const String tongueTwisters = 'tongue-twisters';
+  
 
   static const String avatarUpload = 'storage/avatar';
 

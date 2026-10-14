@@ -28,7 +28,7 @@ import { EventsModule } from './realtime/events.module';
 import { GatewayModule } from './realtime/gateway.module';
 
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
-
+import { TongueTwistersModule } from './tongue-twisters/tongue-twisters.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -59,12 +59,13 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
     // Serve files from:
     // backend/public/
-   
 
-      ServeStaticModule.forRoot({
+
+    ServeStaticModule.forRoot({
       rootPath: join(process.cwd(), 'public'),
       serveRoot: '/',
     }),
+    TongueTwistersModule,
 
     PrismaModule,
     RedisModule,
@@ -97,4 +98,4 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
     },
   ],
 })
-export class AppModule {}
+export class AppModule { }

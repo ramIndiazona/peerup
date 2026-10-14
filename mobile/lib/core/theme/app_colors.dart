@@ -21,4 +21,11 @@ class AppColors {
     end: Alignment.bottomRight,
     colors: [Color(0xFF5B5FF7), Color(0xFF9C4DFF)],
   );
+
+  static const background = Color(0xFF0B1025);
+  static const purple = Color(0xFF9B6DFF);
+  static const pink = Color(0xFFFF71C6);
+  static const blue = Color(0xFF58B7FF);
+  static const text = Color(0xFFF6F4FF);
+  static const muted = Color(0xFFB9BDD5);
 }
