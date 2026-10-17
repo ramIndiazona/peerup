@@ -23,6 +23,9 @@ import 'features/ai/bloc/ai_catalog_cubit.dart';
 import 'features/ai/bloc/ai_session_cubit.dart';
 import 'features/auth/bloc/auth_cubit.dart';
 import 'features/call/cubit/call_cubit.dart';
+import 'features/chat/chat_repository.dart';
+import 'features/friends/bloc/friends_cubit.dart';
+import 'features/friends/friends_repository.dart';
 import 'features/live/cubit/live_cubit.dart';
 import 'features/matchmaking/cubit/matchmaking_cubit.dart';
 import 'features/notifications/bloc/notifications_cubit.dart';
@@ -67,6 +70,8 @@ void main() {
   );
   final notificationsRepository = NotificationsRepository(apiClient);
   final subscriptionRepository = SubscriptionRepository(apiClient);
+  final friendsRepository = FriendsRepository(apiClient);
+  final chatRepository = ChatRepository(apiClient);
 
   final authCubit = AuthCubit(auth: authService);
   final themeCubit = ThemeCubit();
@@ -106,6 +111,8 @@ void main() {
         RepositoryProvider<NotificationsRepository>.value(
           value: notificationsRepository,
         ),
+        RepositoryProvider<FriendsRepository>.value(value: friendsRepository),
+        RepositoryProvider<ChatRepository>.value(value: chatRepository),
         RepositoryProvider<SubscriptionRepository>.value(
           value: subscriptionRepository,
         ),
@@ -123,7 +130,19 @@ void main() {
           BlocProvider(create: (_) => AISessionCubit(repo: aiRepository)),
           BlocProvider(create: (_) => AICatalogCubit(repo: aiRepository)),
           BlocProvider(
-            create: (_) => NotificationsCubit(repo: notificationsRepository),
+            create:
+                (_) => NotificationsCubit(
+                  repo: notificationsRepository,
+                  socket: realtime,
+                ),
+          ),
+          BlocProvider(
+            create:
+                (_) => FriendsCubit(
+                  repo: friendsRepository,
+                  socket: realtime,
+                  currentUserId: () => authCubit.state.user?.id,
+                ),
           ),
           BlocProvider(
             create: (_) => PremiumCubit(repo: subscriptionRepository),

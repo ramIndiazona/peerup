@@ -9,8 +9,7 @@ class APIURL {
   static const String usersMe = 'users/me';
   static const String usersInterests = 'users/interests';
   static String userPublic(String userId) => 'users/$userId';
-    static const String tongueTwisters = 'tongue-twisters';
-  
+  static const String tongueTwisters = 'tongue-twisters';
 
   static const String avatarUpload = 'storage/avatar';
 
@@ -29,6 +28,23 @@ class APIURL {
   static const String notificationsList = 'notifications';
   static String notificationMarkRead(String id) => 'notifications/$id/read';
   static const String notificationsDeviceToken = 'notifications/device-token';
+
+  static const String friendsList = 'friend-requests/friends';
+
+  // ------------------------------------------------------------------
+  // CHAT / CONVERSATIONS
+  //
+  // Backed by the NestJS `ConversationsModule` (Prisma `Conversation` /
+  // `Message`). `POST /conversations` takes `{ friendId }`; history is
+  // `GET /conversations/:id/messages?limit=&before=` and returns a bare,
+  // oldest→newest array. Realtime delivery uses the shared socket event
+  // `CHAT_MESSAGE`.
+  // ------------------------------------------------------------------
+  static const String conversations = 'conversations';
+  static String conversationMessages(String conversationId) =>
+      'conversations/$conversationId/messages';
+  static String conversationRead(String conversationId) =>
+      'conversations/$conversationId/read';
 
   static const String subscriptionsMe = 'subscriptions/me';
   static const String subscriptionsUsage = 'subscriptions/usage';

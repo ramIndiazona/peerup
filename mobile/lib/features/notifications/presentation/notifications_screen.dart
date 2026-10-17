@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../core/utils/load_state.dart';
-import '../../../core/widgets/async_content.dart';
 import '../../../models/app_notification.dart';
 import '../../../models/enums.dart';
 import '../bloc/notifications_cubit.dart';
+
+const Color _bg = Color(0xFF0B1020);
+const Color _surface = Color(0xFF151B30);
+const Color _muted = Color(0xFF9AA5C4);
+const Color _accent = Color(0xFF9B8CFF);
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -15,63 +18,122 @@ class NotificationsScreen extends StatefulWidget {
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
+  final ScrollController _controller = ScrollController();
+
   @override
   void initState() {
     super.initState();
-    Future.microtask(() {
+    _controller.addListener(_onScroll);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final cubit = context.read<NotificationsCubit>();
-      if (!cubit.state.isLoaded && !cubit.state.isLoading) {
+      if (cubit.state.isInitial) {
         cubit.load();
       }
     });
   }
 
   @override
+  void dispose() {
+    _controller.removeListener(_onScroll);
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_controller.hasClients) return;
+    final position = _controller.position;
+    if (position.pixels >= position.maxScrollExtent - 200) {
+      context.read<NotificationsCubit>().loadMore();
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: _bg,
       appBar: AppBar(
-        title: const Text('Notifications'),
+        backgroundColor: _bg,
+        elevation: 0,
+        foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white),
+
+        title: const Text(
+          'Notifications',
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 14,
+            color: Colors.white,
+          ),
+        ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.done_all_rounded),
-            onPressed: () => context.read<NotificationsCubit>().markAllRead(),
+          BlocBuilder<NotificationsCubit, NotificationsState>(
+            buildWhen: (a, b) => a.unreadCount != b.unreadCount,
+            builder: (context, state) {
+              if (state.unreadCount == 0) return const SizedBox.shrink();
+              return TextButton(
+                onPressed:
+                    () => context.read<NotificationsCubit>().markAllRead(),
+                child: const Text(
+                  'Mark all read',
+                  style: TextStyle(color: _accent),
+                ),
+              );
+            },
           ),
         ],
       ),
-      body: BlocBuilder<NotificationsCubit, LoadState<List<AppNotification>>>(
+      body: BlocBuilder<NotificationsCubit, NotificationsState>(
         builder: (context, state) {
-          final items = state.value;
-          return AsyncContent<List<AppNotification>>(
-            value: state,
-            empty: items?.isEmpty ?? false,
-            emptyView: const _EmptyView(),
-            data:
-                (list) => RefreshIndicator(
-                  onRefresh: () => context.read<NotificationsCubit>().load(),
-                  child: ListView.separated(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    itemCount: list.length + 1,
-                    separatorBuilder:
-                        (_, __) => const Divider(height: 1, indent: 72),
-                    itemBuilder: (context, i) {
-                      if (i == list.length) return const SizedBox(height: 80);
-                      final n = list[i];
-                      return _NotificationTile(
-                        notification: n,
-                        onTap: () => _open(context, n),
-                      );
-                    },
+          if (state.isLoading || state.isInitial) {
+            return const Center(
+              child: CircularProgressIndicator(color: _accent),
+            );
+          }
+          if (state.hasError && state.items.isEmpty) {
+            return _ErrorView(
+              error: state.error,
+              onRetry: () => context.read<NotificationsCubit>().load(),
+            );
+          }
+          if (state.isEmpty) {
+            return _EmptyView(
+              onRefresh: () => context.read<NotificationsCubit>().refresh(),
+            );
+          }
+          return RefreshIndicator(
+            color: _accent,
+            backgroundColor: _surface,
+            onRefresh: () => context.read<NotificationsCubit>().refresh(),
+            child: ListView.separated(
+              controller: _controller,
+              physics: const AlwaysScrollableScrollPhysics(),
+              itemCount: state.items.length + 1,
+              separatorBuilder:
+                  (_, __) => const Divider(
+                    height: 1,
+                    indent: 76,
+                    color: Color(0x22FFFFFF),
                   ),
-                ),
+              itemBuilder: (context, i) {
+                if (i == state.items.length) {
+                  return _Footer(loadingMore: state.loadingMore);
+                }
+                final n = state.items[i];
+                return _NotificationTile(
+                  notification: n,
+                  onTap: () {
+                    if (!n.isRead) {
+                      context.read<NotificationsCubit>().markRead(n.id);
+                    }
+                  },
+                );
+              },
+            ),
           );
         },
       ),
     );
-  }
-
-  void _open(BuildContext context, AppNotification n) {
-    context.read<NotificationsCubit>().markRead(n.id);
   }
 }
 
@@ -81,31 +143,34 @@ class _NotificationTile extends StatelessWidget {
   final AppNotification notification;
   final VoidCallback onTap;
 
+  IconData get _icon => switch (notification.type) {
+    NotificationTypeEnum.subscription => Icons.workspace_premium_outlined,
+    NotificationTypeEnum.streak => Icons.local_fire_department_outlined,
+    NotificationTypeEnum.reminder => Icons.alarm_rounded,
+    NotificationTypeEnum.system => Icons.notifications_outlined,
+  };
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final unread = !notification.isRead;
     return ListTile(
-      leading: CircleAvatar(
-        backgroundColor:
-            unread
-                ? theme.colorScheme.primary.withValues(alpha: 0.15)
-                : theme.colorScheme.surfaceContainerHighest,
-        child: Icon(
-          switch (notification.type) {
-            NotificationTypeEnum.subscription =>
-              Icons.workspace_premium_outlined,
-            NotificationTypeEnum.streak => Icons.local_fire_department_outlined,
-            NotificationTypeEnum.reminder => Icons.alarm_rounded,
-            NotificationTypeEnum.system => Icons.notifications_outlined,
-          },
-          color: theme.colorScheme.primary,
-          size: 22,
+      onTap: onTap,
+      leading: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color:
+              unread
+                  ? _accent.withValues(alpha: 0.18)
+                  : _surface.withValues(alpha: 0.9),
+          shape: BoxShape.circle,
         ),
+        child: Icon(_icon, color: _accent, size: 22),
       ),
       title: Text(
         notification.title,
         style: TextStyle(
+          color: Colors.white,
           fontWeight: unread ? FontWeight.w800 : FontWeight.w500,
         ),
       ),
@@ -113,39 +178,109 @@ class _NotificationTile extends StatelessWidget {
         notification.body,
         maxLines: 2,
         overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          fontWeight: unread ? FontWeight.w600 : FontWeight.w400,
-        ),
+        style: const TextStyle(color: _muted, height: 1.3),
       ),
       trailing:
           unread
-              ? Container(
+              ? const SizedBox(
                 width: 10,
                 height: 10,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primary,
-                  shape: BoxShape.circle,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: _accent,
+                    shape: BoxShape.circle,
+                  ),
                 ),
               )
               : null,
-      onTap: onTap,
+    );
+  }
+}
+
+class _Footer extends StatelessWidget {
+  const _Footer({required this.loadingMore});
+
+  final bool loadingMore;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 24),
+      child:
+          loadingMore
+              ? const Center(
+                child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: _accent,
+                  ),
+                ),
+              )
+              : const SizedBox(height: 40),
     );
   }
 }
 
 class _EmptyView extends StatelessWidget {
-  const _EmptyView();
+  const _EmptyView({required this.onRefresh});
+
+  final Future<void> Function() onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    return RefreshIndicator(
+      color: _accent,
+      backgroundColor: _surface,
+      onRefresh: onRefresh,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: const [
+          SizedBox(height: 140),
+          Icon(Icons.notifications_none_rounded, size: 52, color: _muted),
+          SizedBox(height: 12),
+          Center(
+            child: Text(
+              'No notifications yet',
+              style: TextStyle(color: _muted),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ErrorView extends StatelessWidget {
+  const _ErrorView({required this.error, required this.onRetry});
+
+  final Object? error;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.notifications_none_rounded, size: 48),
-          const SizedBox(height: 12),
-          const Text('No notifications yet'),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.cloud_off_rounded, size: 44, color: _muted),
+            const SizedBox(height: 12),
+            Text(
+              '$error',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: _muted),
+            ),
+            const SizedBox(height: 16),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: _accent),
+              onPressed: onRetry,
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
       ),
     );
   }

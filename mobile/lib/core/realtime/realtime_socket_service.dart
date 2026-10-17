@@ -7,6 +7,7 @@ import '../auth/token_manager.dart';
 import '../config/app_config.dart';
 import 'realtime_connection_state.dart';
 import 'realtime_event.dart';
+import 'realtime_event_bus.dart';
 
 /// Single shared realtime connection to the NestJS `/realtime` gateway.
 ///
@@ -32,7 +33,7 @@ import 'realtime_event.dart';
 /// Socket.IO `connect` does NOT mean the application is authenticated.
 /// Authentication is considered complete only after the backend sends
 /// `CONNECTED`.
-class RealtimeSocketService {
+class RealtimeSocketService implements RealtimeEventBus {
   RealtimeSocketService({
     required TokenManager tokens,
   }) : _tokens = tokens;
@@ -47,6 +48,18 @@ class RealtimeSocketService {
   final StreamController<RealtimeConnectionState>
       _connectionController =
       StreamController<RealtimeConnectionState>.broadcast();
+
+  /// Broadcast of named server events that are not part of the typed
+  /// [RealtimeEventType] vocabulary. See [RealtimeRawEvent].
+  final StreamController<RealtimeRawEvent> _serverEvents =
+      StreamController<RealtimeRawEvent>.broadcast();
+
+  /// Reference counts of extra event names requested via [subscribe].
+  ///
+  /// Keeping the names (rather than only the live socket handlers) lets the
+  /// service re-attach every subscription to the replacement socket after a
+  /// reconnect.
+  final Map<String, int> _subscriptionRefCounts = <String, int>{};
 
   Timer? _heartbeat;
   Timer? _reconnectTimer;
@@ -85,9 +98,85 @@ class RealtimeSocketService {
 
   Stream<RealtimeEvent> get events => _events.stream;
 
+  @override
+  Stream<RealtimeRawEvent> get serverEvents =>
+      _serverEvents.stream;
+
+  @override
   Stream<RealtimeConnectionState>
       get connectionStateStream =>
           _connectionController.stream;
+
+  // ============================================================
+  // EXTRA (NAMED) SERVER EVENTS
+  // ============================================================
+
+  /// Subscribe to a named server event (reference counted).
+  @override
+  void subscribe(String event) {
+    final count = _subscriptionRefCounts[event] ?? 0;
+    _subscriptionRefCounts[event] = count + 1;
+    if (count == 0) {
+      _attachExtraListener(_socket, event);
+    }
+  }
+
+  /// Release a named server event subscription.
+  @override
+  void unsubscribe(String event) {
+    final count = _subscriptionRefCounts[event];
+    if (count == null) return;
+
+    if (count > 1) {
+      _subscriptionRefCounts[event] = count - 1;
+      return;
+    }
+
+    _subscriptionRefCounts.remove(event);
+    try {
+      _socket?.off(event);
+    } catch (_) {}
+  }
+
+  void _attachExtraListener(io.Socket? socket, String event) {
+    if (socket == null) return;
+    socket.on(event, (dynamic data) {
+      if (!identical(_socket, socket)) return;
+      _pushRaw(event, data);
+    });
+  }
+
+  void _attachExtraListeners(io.Socket socket) {
+    for (final event in _subscriptionRefCounts.keys) {
+      _attachExtraListener(socket, event);
+    }
+  }
+
+  void _pushRaw(String name, dynamic data) {
+    if (_serverEvents.isClosed) return;
+
+    final Map<String, dynamic> map;
+    if (data is Map<String, dynamic>) {
+      map = data;
+    } else if (data is Map) {
+      map = Map<String, dynamic>.from(data);
+    } else if (data is List && data.isNotEmpty) {
+      final first = data.first;
+      if (first is Map<String, dynamic>) {
+        map = first;
+      } else if (first is Map) {
+        map = Map<String, dynamic>.from(first);
+      } else {
+        map = <String, dynamic>{'payload': data};
+      }
+    } else if (data == null) {
+      map = <String, dynamic>{};
+    } else {
+      map = <String, dynamic>{'payload': data};
+    }
+
+    _serverEvents.add(RealtimeRawEvent(name, map));
+  }
 
   // ============================================================
   // CONNECTION STATE
@@ -96,6 +185,7 @@ class RealtimeSocketService {
   RealtimeConnectionState _connection =
       RealtimeConnectionState.disconnected;
 
+  @override
   RealtimeConnectionState get connectionState =>
       _connection;
 
@@ -230,6 +320,9 @@ class RealtimeSocketService {
     );
 
     _socket = socket;
+
+    // Re-attach every feature subscription to the fresh socket.
+    _attachExtraListeners(socket);
 
     // ----------------------------------------------------------
     // CURRENT SOCKET CHECK
@@ -1418,6 +1511,8 @@ class RealtimeSocketService {
     await disconnect();
 
     await _events.close();
+
+    await _serverEvents.close();
 
     await _connectionController.close();
   }

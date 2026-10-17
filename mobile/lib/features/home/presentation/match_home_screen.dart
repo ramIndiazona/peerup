@@ -628,6 +628,8 @@ import '../../../core/config/app_routes.dart';
 
 import '../../../core/theme/app_colors.dart';
 
+import '../../../core/widgets/unread_badge.dart';
+
 import '../../../core/widgets/user_avatar.dart';
 
 import '../../../models/enums.dart';
@@ -639,6 +641,8 @@ import '../../../models/matchmaking.dart';
 import '../../live/cubit/live_cubit.dart';
 
 import '../../matchmaking/cubit/matchmaking_cubit.dart';
+
+import '../../notifications/bloc/notifications_cubit.dart';
 
 import '../../profile/bloc/profile_cubit.dart';
 
@@ -670,6 +674,15 @@ class _MatchHomeScreenState extends State<MatchHomeScreen> {
       if (!cubit.state.characters.isLoaded &&
           !cubit.state.characters.isLoading) {
         cubit.load();
+      }
+
+      if (!mounted) return;
+
+      // Populate the notification badge on the home AppBar.
+      final notifications = context.read<NotificationsCubit>();
+
+      if (notifications.state.isInitial) {
+        notifications.load();
       }
     });
   }
@@ -863,28 +876,40 @@ class _MatchHomeScreenState extends State<MatchHomeScreen> {
 
                     // Notification
                     GestureDetector(
-                      onTap: () {},
+                      onTap: () => context.push(AppRoutes.notifications),
 
-                      child: const Icon(
-                        Icons.notifications_none_rounded,
+                      child:
+                          BlocBuilder<NotificationsCubit, NotificationsState>(
+                            buildWhen:
+                                (previous, current) =>
+                                    previous.unreadCount != current.unreadCount,
 
-                        size: 30,
+                            builder:
+                                (context, state) => UnreadBadge(
+                                  count: state.unreadCount,
 
-                        color: const Color(0xFF9AA5C4),
-                      ),
+                                  child: const Icon(
+                                    Icons.notifications_none_rounded,
+
+                                    size: 30,
+
+                                    color: Color(0xFF9AA5C4),
+                                  ),
+                                ),
+                          ),
                     ),
 
                     const SizedBox(width: 22),
 
                     GestureDetector(
-                      onTap: () {},
+                      onTap: () => context.push(AppRoutes.friends),
 
                       child: const Icon(
                         Icons.chat_bubble_outline_rounded,
 
                         size: 30,
 
-                        color: const Color(0xFF9AA5C4),
+                        color: Color(0xFF9AA5C4),
                       ),
                     ),
                   ],

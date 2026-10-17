@@ -16,10 +16,16 @@ import '../../features/auth/presentation/register_screen.dart';
 import '../../features/auth/presentation/splash_screen.dart';
 import '../../features/call/call_end_screen.dart';
 import '../../features/call/call_page.dart';
+import '../../features/chat/bloc/chat_cubit.dart';
+import '../../features/chat/chat_repository.dart';
+import '../../features/chat/presentation/chat_screen.dart';
+import '../../features/friends/presentation/friends_screen.dart';
 import '../../features/home/presentation/home_shell.dart';
 import '../../features/home/presentation/match_home_screen.dart';
 import '../../features/searching/searching_page.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
+import '../../models/friend.dart';
+import '../realtime/realtime_socket_service.dart';
 import '../../features/onboarding/onboarding_screen.dart';
 import '../../features/premium/presentation/premium_screen.dart';
 import '../../features/profile/presentation/edit_profile_screen.dart';
@@ -177,7 +183,6 @@ class AppRouter {
             //     ),
             //   ],
             // ),
-
             StatefulShellBranch(
               routes: [
                 GoRoute(
@@ -278,6 +283,39 @@ class AppRouter {
           name: 'notifications',
           builder: (context, state) {
             return const NotificationsScreen();
+          },
+        ),
+
+        // --------------------------------------------------
+        // FRIENDS (Messages)
+        // --------------------------------------------------
+        GoRoute(
+          path: AppRoutes.friends,
+          name: 'friends',
+          builder: (context, state) {
+            return const FriendsScreen();
+          },
+        ),
+
+        // --------------------------------------------------
+        // CHAT (one-to-one with a friend)
+        // --------------------------------------------------
+        GoRoute(
+          path: AppRoutes.chat,
+          name: 'chat',
+          builder: (context, state) {
+            final friendId = state.pathParameters['friendId'] ?? '';
+            final friend = state.extra is Friend ? state.extra as Friend : null;
+            return BlocProvider(
+              create:
+                  (_) => ChatCubit(
+                    repo: context.read<ChatRepository>(),
+                    friendId: friendId,
+                    socket: context.read<RealtimeSocketService>(),
+                    currentUserId: authCubit.state.user?.id,
+                  ),
+              child: ChatScreen(friendId: friendId, friend: friend),
+            );
           },
         ),
 

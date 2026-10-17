@@ -18,8 +18,12 @@ class AppRoutes {
   static const String publicProfile = '/profile/:id';
   static const String premium = '/premium';
   static const String notifications = '/notifications';
+  static const String friends = '/friends';
+  static const String chat = '/chat/:friendId';
   static const String settings = '/settings';
   static const String editProfile = '/edit-profile';
+
+  static String chatWith(String friendId) => '/chat/$friendId';
 
   static const String aiChat = '/ai/chat';
   static const String aiFeedback = '/ai/feedback/:sessionId';
