@@ -1,7 +1,8 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService, JwtSignOptions } from '@nestjs/jwt';
 import { RedisService } from '../redis/redis.service';
+
 
 const REFRESH_VERSION_KEY = 'auth:refresh:version:';
 
@@ -25,6 +26,7 @@ export class TokenService {
   private readonly accessExpiresIn: string;
   private readonly refreshExpiresIn: number;
   private readonly issuer: string;
+  private readonly logger = new Logger(TokenService.name);
 
   constructor(
     private readonly jwt: JwtService,
@@ -63,16 +65,33 @@ export class TokenService {
     });
   }
 
+  // verifyAccess(token: string): AccessTokenPayload {
+  //   try {
+  //     return this.jwt.verify<AccessTokenPayload>(token, {
+  //       secret: this.accessSecret,
+  //       issuer: this.issuer,
+  //     });
+  //   } catch {
+  //     throw new UnauthorizedException('Invalid token');
+  //   }
+  // }
   verifyAccess(token: string): AccessTokenPayload {
     try {
       return this.jwt.verify<AccessTokenPayload>(token, {
         secret: this.accessSecret,
         issuer: this.issuer,
       });
-    } catch {
+    } catch (error) {
+      this.logger.warn(
+        `Access token verification failed: ${error instanceof Error ? error.name : 'UnknownError'
+        } - ${error instanceof Error ? error.message : 'Unknown error'
+        }`,
+      );
+
       throw new UnauthorizedException('Invalid token');
     }
   }
+
 
   async verifyRefresh(token: string): Promise<RefreshTokenPayload> {
     let payload: RefreshTokenPayload;

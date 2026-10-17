@@ -29,6 +29,7 @@ import { GatewayModule } from './realtime/gateway.module';
 
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { TongueTwistersModule } from './tongue-twisters/tongue-twisters.module';
+import { FriendRequestsModule } from './friend-requests/friend-requests.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -66,6 +67,7 @@ import { TongueTwistersModule } from './tongue-twisters/tongue-twisters.module';
       serveRoot: '/',
     }),
     TongueTwistersModule,
+    FriendRequestsModule,
 
     PrismaModule,
     RedisModule,
