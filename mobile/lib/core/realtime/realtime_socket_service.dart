@@ -783,6 +783,15 @@ class RealtimeSocketService implements RealtimeEventBus {
     // CALL CONNECTED
     // ==========================================================
 
+    for (final entry in {
+      'CALL_RECONNECTING': RealtimeEventType.callReconnecting,
+      'CALL_RECONNECTED': RealtimeEventType.callReconnected,
+    }.entries) {
+      socket.on(entry.key, (data) {
+        if (isCurrentSocket()) _push(_typed(entry.value, data));
+      });
+    }
+
     socket.on(
       'CALL_CONNECTED',
       (data) {
@@ -1411,6 +1420,10 @@ class RealtimeSocketService implements RealtimeEventBus {
         'data': candidate,
       },
     );
+  }
+
+  void requestCallRecovery(String callId) {
+    if (isAuthenticated) _emit('CALL_RECONNECTING', {'callId': callId});
   }
 
   void reportCallConnected(

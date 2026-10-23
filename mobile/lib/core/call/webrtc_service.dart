@@ -210,9 +210,11 @@ class WebRtcService {
   }
 
   Future<Map<String, dynamic>> createOffer(
-    ActiveWebRtcCall call,
-  ) async {
+    ActiveWebRtcCall call, {
+    bool iceRestart = false,
+  }) async {
     final offer = await call.pc.createOffer({
+      if (iceRestart) 'iceRestart': true,
       'offerToReceiveAudio': 1,
       'offerToReceiveVideo': 0,
     });

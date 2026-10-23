@@ -53,6 +53,8 @@ class CallCubit extends Cubit<CallState> {
         _startTimer();
         debugPrint('[Call] connected');
         emit(state.copyWith(phase: CallPhase.connected, hasRemoteAudio: true));
+      case CallServiceEventType.reconnecting:
+        emit(state.copyWith(phase: CallPhase.reconnecting));
       case CallServiceEventType.ended:
         _stopTimer();
         debugPrint('[Call] ended');
@@ -64,7 +66,7 @@ class CallCubit extends Cubit<CallState> {
   }
 
   void _startTimer() {
-    _stopTimer();
+    if (_timer != null) return;
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       emit(state.copyWith(elapsedSeconds: state.elapsedSeconds + 1));
     });

@@ -17,6 +17,8 @@ enum RealtimeEventType {
   callAnswer,
   iceCandidate,
   callConnected,
+  callReconnecting,
+  callReconnected,
   callEnded,
   heartbeatAck,
   error,

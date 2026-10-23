@@ -2579,6 +2579,7 @@ export class RealtimeGateway
         "CONNECTED",
         {
           userId,
+          callReconnectTimeoutSeconds: this.calls.reconnectTimeoutSeconds,
 
           heartbeatIntervalSeconds:
             this.config.get<number>(
@@ -2587,6 +2588,8 @@ export class RealtimeGateway
             ),
         },
       );
+
+      await this.calls.handleReconnect(userId);
 
       // --------------------------------------------------------
       // Send current live snapshot
@@ -2773,6 +2776,7 @@ export class RealtimeGateway
 
         await this.calls.handleDisconnect(
           userId,
+          socket.id,
         );
 
         return;
@@ -3116,6 +3120,17 @@ export class RealtimeGateway
   // ============================================================
   // CALL CONNECTED
   // ============================================================
+
+  @SubscribeMessage("CALL_RECONNECTING")
+  async onCallReconnecting(socket: Socket, payload: { callId: string }): Promise<void> {
+    try {
+      const userId = this.requireUser(socket);
+      if (!payload?.callId) throw new ApiException('INVALID_CALL', 'callId is required', 400);
+      await this.calls.requestRecovery(payload.callId, userId);
+    } catch (error) {
+      this.error(socket, error);
+    }
+  }
 
   @SubscribeMessage("CALL_CONNECTED")
   async onCallConnected(

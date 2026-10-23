@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 import '../../models/call.dart';
+import '../../models/enums.dart';
 import '../../models/profile.dart';
 import '../realtime/realtime_event.dart';
 import '../realtime/realtime_socket_service.dart';
@@ -12,6 +13,7 @@ import 'webrtc_service.dart';
 
 enum CallServiceEventType {
   connected,
+  reconnecting,
   ended,
   failed,
 }
@@ -83,6 +85,28 @@ class CallService {
   bool _callActive = false;
 
   bool _connected = false;
+  bool _reconnecting = false;
+  bool _peerUnavailable = false;
+  bool _recoveryBusy = false;
+  /// The single reconnect grace period used by this service.
+  ///
+  /// The backend advertises its own value in `CONNECTED`
+  /// (`callReconnectTimeoutSeconds`); this default only covers the case of an
+  /// older server. Never duplicate the value inline.
+  static const reconnectTimeout = Duration(seconds: 15);
+
+  /// How often the recovery loop re-checks the existing peer connection.
+  static const _retryInterval = Duration(seconds: 2);
+
+  Timer? _reconnectTimer;
+  Timer? _recoveryRetry;
+  Duration _reconnectTimeout = reconnectTimeout;
+  Map<String, dynamic>? _restartOffer;
+  String? _answeredRestartSdp;
+  Map<String, dynamic>? _restartAnswer;
+  final List<Map<String, dynamic>> _recoveryIce = [];
+  final Set<String> _pendingHangups = {};
+  Future<void> _signalWork = Future<void>.value();
 
   bool _remoteDescriptionSet = false;
 
@@ -113,6 +137,7 @@ class CallService {
     required String role,
     required PublicProfile peer,
   }) async {
+    if (_callActive && _callId == callId) return;
     if (_starting) {
       debugPrint(
         '[CALL] start ignored: already starting',
@@ -298,41 +323,25 @@ class CallService {
         break;
 
       case RTCPeerConnectionState.RTCPeerConnectionStateDisconnected:
-        // WebRTC can temporarily enter disconnected state.
-        //
-        // Do not immediately destroy the call.
-        // ICE may recover.
-        debugPrint(
-          '[CALL] peer temporarily disconnected',
-        );
-        break;
-
       case RTCPeerConnectionState.RTCPeerConnectionStateFailed:
-        debugPrint(
-          '[CALL] peer connection failed',
-        );
-
-        final callId = _callId;
-
-        if (callId != null) {
-          _socket.reportCallFailed(
-            callId,
-            'peer connection failed',
-          );
+        if (_connected) {
+          _beginRecovery();
+        } else if (state == RTCPeerConnectionState.RTCPeerConnectionStateFailed) {
+          final id = _callId;
+          if (id != null) {
+            _socket.reportCallFailed(
+              id,
+              'peer connection failed',
+            );
+          }
+          unawaited(end(notifyBackend: false));
         }
-
-        unawaited(
-          end(
-            notifyBackend: false,
-          ),
-        );
-
         break;
 
       case RTCPeerConnectionState.RTCPeerConnectionStateClosed:
-        debugPrint(
-          '[CALL] peer connection closed',
-        );
+        if (_callActive) {
+          unawaited(end());
+        }
         break;
 
       default:
@@ -340,10 +349,22 @@ class CallService {
     }
   }
 
+  /// The peer connection reported a live media path.
+  ///
+  /// During recovery this clears the reconnect state, keeps the same call
+  /// session and keeps the call timer running.
   void _markConnected() {
-    if (_connected) {
+    if (_reconnecting) {
+      if (!_socket.isAuthenticated) return;
+      _clearRecovery();
+      final id = _callId;
+      if (id != null) {
+        _socket.reportCallConnected(id);
+      }
+      _add(const CallServiceEvent(CallServiceEventType.connected));
       return;
     }
+    if (_connected) return;
 
     if (!_callActive) {
       return;
@@ -371,6 +392,142 @@ class CallService {
     );
   }
 
+  void _beginRecovery({bool notifyPeer = true}) {
+    if (!_callActive || !_connected) return;
+    if (!_reconnecting) {
+      _reconnecting = true;
+      _add(const CallServiceEvent(CallServiceEventType.reconnecting));
+      final id = _callId;
+      _reconnectTimer = Timer(_reconnectTimeout, () {
+        if (_callActive && _reconnecting && _callId == id) {
+          // The normal ending path owns local cleanup and END_CALL delivery.
+          unawaited(end());
+        }
+      });
+      _recoveryRetry = Timer.periodic(_retryInterval, (_) {
+        unawaited(_attemptRecovery());
+      });
+      if (notifyPeer && id != null) _socket.requestCallRecovery(id);
+    }
+    unawaited(_attemptRecovery());
+  }
+
+  Future<void> _attemptRecovery() async {
+    final call = _webrtcCall;
+    final id = _callId;
+    if (!_reconnecting ||
+        !_callActive ||
+        call == null ||
+        id == null ||
+        _recoveryBusy) {
+      return;
+    }
+
+    _recoveryBusy = true;
+
+    try {
+      // ------------------------------------------------------------
+      // A working media path is authoritative.
+      //
+      // A signaling-only interruption (socket blip, peer ICE
+      // restart) must not freeze or end a call whose audio is
+      // still flowing, so this is checked before the socket guards.
+      // ------------------------------------------------------------
+      if (await _isMediaHealthy(call)) {
+        if (_webrtcCall != call || !_reconnecting) return;
+        if (_socket.isAuthenticated) {
+          _markConnected();
+        }
+        return;
+      }
+
+      if (!_socket.isAuthenticated || _peerUnavailable) return;
+
+      if (_role != 'caller') {
+        // Only the original caller offers, preventing offer glare.
+        _socket.requestCallRecovery(id);
+        return;
+      }
+
+      final signaling = await call.pc.getSignalingState();
+      if (_webrtcCall != call || !_reconnecting) return;
+      if (signaling == RTCSignalingState.RTCSignalingStateStable) {
+        _remoteDescriptionSet = false;
+        _recoveryIce.clear();
+        _restartOffer = await _webrtc.createOffer(call, iceRestart: true);
+      }
+      if (_webrtcCall != call || !_reconnecting) return;
+      final offer = _restartOffer;
+      if (offer != null) {
+        // Retry the same pending offer if its answer was lost while offline.
+        _socket.sendOffer(id, {...offer, 'iceRestart': true});
+        for (final ice in _recoveryIce) {
+          _socket.sendIce(id, ice);
+        }
+      }
+    } catch (error) {
+      debugPrint('[CALL] recovery attempt failed: $error');
+      // Keep the original deadline; transient signaling errors are retryable.
+    } finally {
+      _recoveryBusy = false;
+    }
+  }
+
+  /// True when the existing peer connection still carries audio.
+  ///
+  /// Both states are required: `connected` alone can be reported while ICE
+  /// consent checks are already failing, which would cancel recovery on a
+  /// dead media path.
+  Future<bool> _isMediaHealthy(
+    ActiveWebRtcCall call,
+  ) async {
+    final connection = await call.pc.getConnectionState();
+
+    if (connection !=
+        RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
+      return false;
+    }
+
+    final ice = await call.pc.getIceConnectionState();
+
+    return ice == null ||
+        ice == RTCIceConnectionState.RTCIceConnectionStateConnected ||
+        ice == RTCIceConnectionState.RTCIceConnectionStateCompleted;
+  }
+
+  Future<void> _socketRestored() async {
+    for (final id in _pendingHangups.toList()) {
+      _socket.endCall(id);
+      _pendingHangups.remove(id);
+    }
+    final id = _callId;
+    if (!_callActive || !_connected || id == null) return;
+    try {
+      final details = await _repo.getCall(id);
+      if (_callId != id || !_callActive) return;
+      if (details.call.status == CallStatus.ended || details.call.status == CallStatus.cancelled) {
+        await end(notifyBackend: false);
+        return;
+      }
+      await _attemptRecovery();
+    } catch (error) {
+      debugPrint('[CALL] recovery verification failed: $error');
+    }
+  }
+
+  void _clearRecovery() {
+    _reconnectTimer?.cancel();
+    _recoveryRetry?.cancel();
+    _reconnectTimer = null;
+    _recoveryRetry = null;
+    _reconnecting = false;
+    _peerUnavailable = false;
+    _restartOffer = null;
+    _restartAnswer = null;
+    _answeredRestartSdp = null;
+    _recoveryIce.clear();
+  }
+
   // ---------------------------------------------------------------------------
   // HANG UP / END
   // ---------------------------------------------------------------------------
@@ -383,6 +540,7 @@ class CallService {
         '[CALL] user hangup callId=$callId',
       );
 
+      if (!_socket.isAuthenticated) _pendingHangups.add(callId);
       _socket.endCall(
         callId,
       );
@@ -406,6 +564,7 @@ class CallService {
       return;
     }
 
+    _clearRecovery();
     _callActive = false;
     _connected = false;
     _remoteDescriptionSet = false;
@@ -418,6 +577,7 @@ class CallService {
     // Tell backend to end the call when required.
     // ------------------------------------------------------------
     if (notifyBackend && callId != null) {
+      if (!_socket.isAuthenticated) _pendingHangups.add(callId);
       try {
         _socket.endCall(
           callId,
@@ -475,6 +635,7 @@ class CallService {
   ///
   /// Used by the UI when resetting state.
   Future<void> teardown() async {
+    _clearRecovery();
     _callActive = false;
     _connected = false;
     _remoteDescriptionSet = false;
@@ -529,6 +690,7 @@ class CallService {
       'callId=$callId',
     );
 
+    if (_reconnecting) _recoveryIce.add(ice);
     _socket.sendIce(
       callId,
       ice,
@@ -543,6 +705,30 @@ class CallService {
     RealtimeEvent event,
   ) {
     switch (event.type) {
+      case RealtimeEventType.disconnected:
+        _beginRecovery(notifyPeer: false);
+        break;
+      case RealtimeEventType.connected:
+        final seconds = event.data['callReconnectTimeoutSeconds'];
+        if (seconds is num && seconds > 0) {
+          _reconnectTimeout = Duration(milliseconds: (seconds * 1000).round());
+        }
+        unawaited(_socketRestored());
+        break;
+      case RealtimeEventType.callReconnecting:
+        if (event.callId == _callId) {
+          if (event.data['reason'] == 'socket_disconnected') {
+            _peerUnavailable = true;
+          }
+          _beginRecovery(notifyPeer: false);
+        }
+        break;
+      case RealtimeEventType.callReconnected:
+        if (event.callId == _callId) {
+          _peerUnavailable = false;
+          _beginRecovery(notifyPeer: false);
+        }
+        break;
       case RealtimeEventType.callOffer:
       case RealtimeEventType.callAnswer:
       case RealtimeEventType.iceCandidate:
@@ -638,10 +824,27 @@ class CallService {
       return;
     }
 
+    _enqueueSignal(event);
+  }
+
+  /// Serialize signaling handling so offer/answer/ICE always apply in order.
+  ///
+  /// The chain must never end in an error: a single failed event would
+  /// otherwise skip every later callback and silently drop the rest of the
+  /// negotiation.
+  void _enqueueSignal(RealtimeEvent event) {
+    _signalWork = _signalWork.then(
+      (_) => _processSignalingEvent(event),
+      onError: (Object _) => _processSignalingEvent(event),
+    );
+
     unawaited(
-      _processSignalingEvent(
-        event,
-      ),
+      _signalWork.catchError((Object _) {
+        debugPrint(
+          '[CALL] signaling task failed '
+          'type=${event.type}',
+        );
+      }),
     );
   }
 
@@ -733,6 +936,10 @@ class CallService {
         'type=${event.type} error=$e',
       );
 
+      if (_connected) {
+        _beginRecovery();
+        return;
+      }
       final callId = _callId;
 
       if (callId != null) {
@@ -775,6 +982,17 @@ class CallService {
       'callId=$callId',
     );
 
+    final restarting = offer['iceRestart'] == true && _connected;
+    if (restarting) {
+      if (_answeredRestartSdp == offer['sdp'] && _restartAnswer != null) {
+        _socket.sendAnswer(callId, _restartAnswer!);
+        for (final ice in _recoveryIce) { _socket.sendIce(callId, ice); }
+        return;
+      }
+      _beginRecovery(notifyPeer: false);
+      _remoteDescriptionSet = false;
+      _recoveryIce.clear();
+    }
     await _webrtc.acceptOffer(
       webrtc,
       offer,
@@ -798,6 +1016,11 @@ class CallService {
       'callId=$callId',
     );
 
+    if (_webrtcCall != webrtc || !_callActive) return;
+    if (restarting) {
+      _answeredRestartSdp = offer['sdp'] as String?;
+      _restartAnswer = answer;
+    }
     _socket.sendAnswer(
       callId,
       answer,
@@ -831,10 +1054,13 @@ class CallService {
       'callId=$callId',
     );
 
+    // A repeated answer after a successful retry must not fail a stable call.
+    if (_connected && await webrtc.pc.getSignalingState() == RTCSignalingState.RTCSignalingStateStable) return;
     await _webrtc.acceptAnswer(
       webrtc,
       answer,
     );
+    if (_webrtcCall != webrtc || !_callActive) return;
 
     _remoteDescriptionSet = true;
 
