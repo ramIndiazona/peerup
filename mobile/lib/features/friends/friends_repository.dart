@@ -49,4 +49,23 @@ class FriendsRepository {
     }
     return FriendsPage.fromJson(map, currentUserId: currentUserId);
   }
+
+  Future<dynamic> sendFriendRequest({
+    required String receiverId,
+    required String? reaction,
+    required List<String> feedback,
+    required bool addToFriends,
+    required bool connectAgain,
+  }) async {
+    return _api.post(
+      APIURL.addfriends,
+      data: {
+        'receiverId': receiverId,
+        'reaction': reaction,
+        'feedback': feedback,
+        'addToFriends': addToFriends,
+        'connectAgain': connectAgain,
+      },
+    );
+  }
 }

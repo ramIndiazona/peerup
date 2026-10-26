@@ -29,6 +29,10 @@ class APIURL {
   static String notificationMarkRead(String id) => 'notifications/$id/read';
   static const String notificationsDeviceToken = 'notifications/device-token';
 
+
+  static const String addfriends = 'friend-requests';
+  static const String callFeedback = 'call-feedback';
+
   static const String friendsList = 'friend-requests/friends';
 
   // ------------------------------------------------------------------

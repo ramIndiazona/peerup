@@ -168,6 +168,9 @@ export class FriendRequestsService {
     return { status: 'PENDING', request };
   }
 
+
+  
+
   async receivedRequests(userId: string) {
     return this.prisma.friendRequest.findMany({
       where: {

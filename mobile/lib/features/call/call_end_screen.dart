@@ -1,303 +1,21 @@
-// import 'package:flutter/material.dart';
-// import 'package:flutter_bloc/flutter_bloc.dart';
-// import 'package:go_router/go_router.dart';
-
-// import '../../core/call/call_repository.dart';
-// import '../../core/config/app_routes.dart';
-// import '../../core/theme/app_colors.dart';
-// import '../../core/widgets/loading_button.dart';
-// import '../../models/enums.dart';
-// import '../matchmaking/cubit/matchmaking_cubit.dart';
-// import '../profile/profile_repository.dart';
-// import 'cubit/call_cubit.dart';
-// import 'cubit/call_state.dart';
-
-// class CallEndScreen extends StatefulWidget {
-//   const CallEndScreen({super.key});
-
-//   @override
-//   State<CallEndScreen> createState() => _CallEndScreenState();
-// }
-
-// class _CallEndScreenState extends State<CallEndScreen> {
-//   final bool _busy = false;
-
-//   @override
-//   void initState() {
-//     super.initState();
-//     Future.microtask(() {
-//       if (!mounted) return;
-//       context.read<CallCubit>().reset();
-//     });
-//   }
-
-//   Future<void> _goHome() async {
-//     context.read<MatchmakingCubit>().reset();
-//     context.go(AppRoutes.homeMatch);
-//   }
-
-//   Future<void> _showReportSheet() async {
-//     final match = context.read<MatchmakingCubit>().state.match;
-//     final peer = match?.peer;
-//     if (peer == null) return;
-//     await showModalBottomSheet<void>(
-//       context: context,
-//       isScrollControlled: true,
-//       builder:
-//           (context) => _ReportSheet(peerId: peer.id, callId: match!.callId),
-//     );
-//   }
-
-//   @override
-//   Widget build(BuildContext context) {
-//     final theme = Theme.of(context);
-
-//     return BlocBuilder<CallCubit, CallState>(
-//       builder: (context, state) {
-//         return Scaffold(
-//           body: SafeArea(
-//             child: Padding(
-//               padding: const EdgeInsets.all(28),
-//               child: Column(
-//                 crossAxisAlignment: CrossAxisAlignment.stretch,
-//                 children: [
-//                   const SizedBox(height: 40),
-//                   Icon(
-//                     Icons.check_circle_rounded,
-//                     size: 64,
-//                     color: AppColors.success,
-//                   ),
-//                   const SizedBox(height: 16),
-//                   Text(
-//                     'Call finished',
-//                     textAlign: TextAlign.center,
-//                     style: theme.textTheme.headlineSmall?.copyWith(
-//                       fontWeight: FontWeight.w800,
-//                     ),
-//                   ),
-//                   const SizedBox(height: 8),
-//                   Text(
-//                     'Nice job staying in the conversation. Keep practicing!',
-//                     textAlign: TextAlign.center,
-//                     style: theme.textTheme.bodyMedium?.copyWith(
-//                       color: theme.colorScheme.outline,
-//                     ),
-//                   ),
-//                   const SizedBox(height: 28),
-//                   Card(
-//                     child: Padding(
-//                       padding: const EdgeInsets.all(18),
-//                       child: Row(
-//                         children: [
-//                           Icon(
-//                             Icons.timer_outlined,
-//                             color: theme.colorScheme.primary,
-//                           ),
-//                           const SizedBox(width: 12),
-//                           Text(
-//                             'Call duration',
-//                             style: theme.textTheme.bodyMedium?.copyWith(
-//                               fontWeight: FontWeight.w600,
-//                             ),
-//                           ),
-//                           const Spacer(),
-//                           Text(
-//                             _format(state.elapsedSeconds),
-//                             style: theme.textTheme.titleMedium?.copyWith(
-//                               fontWeight: FontWeight.w800,
-//                             ),
-//                           ),
-//                         ],
-//                       ),
-//                     ),
-//                   ),
-//                   const SizedBox(height: 12),
-//                   Card(
-//                     child: Padding(
-//                       padding: const EdgeInsets.all(18),
-//                       child: Row(
-//                         children: [
-//                           Icon(
-//                             Icons.translate_rounded,
-//                             color: theme.colorScheme.primary,
-//                           ),
-//                           const SizedBox(width: 12),
-//                           Text(
-//                             'Daily practice streak grows',
-//                             style: theme.textTheme.bodyMedium?.copyWith(
-//                               fontWeight: FontWeight.w600,
-//                             ),
-//                           ),
-//                           const Spacer(),
-//                           const Icon(Icons.trending_up_rounded),
-//                         ],
-//                       ),
-//                     ),
-//                   ),
-//                   const SizedBox(height: 28),
-//                   const Spacer(),
-//                   OutlinedButton.icon(
-//                     onPressed: _busy ? null : _showReportSheet,
-//                     icon: const Icon(Icons.flag_outlined),
-//                     label: const Text('Report the peer'),
-//                     style: OutlinedButton.styleFrom(
-//                       foregroundColor: AppColors.danger,
-//                     ),
-//                   ),
-//                   const SizedBox(height: 12),
-//                   LoadingButton(label: 'Back to home', onPressed: _goHome),
-//                   const SizedBox(height: 16),
-//                 ],
-//               ),
-//             ),
-//           ),
-//         );
-//       },
-//     );
-//   }
-
-//   String _format(int seconds) {
-//     final m = (seconds ~/ 60).toString().padLeft(2, '0');
-//     final s = (seconds % 60).toString().padLeft(2, '0');
-//     return '$m:$s';
-//   }
-// }
-
-// class _ReportSheet extends StatefulWidget {
-//   const _ReportSheet({required this.peerId, required this.callId});
-
-//   final String peerId;
-//   final String callId;
-
-//   @override
-//   State<_ReportSheet> createState() => _ReportSheetState();
-// }
-
-// class _ReportSheetState extends State<_ReportSheet> {
-//   ReportReason? _reason;
-//   final _description = TextEditingController();
-//   bool _busy = false;
-
-//   @override
-//   void dispose() {
-//     _description.dispose();
-//     super.dispose();
-//   }
-
-//   Future<void> _submit() async {
-//     if (_reason == null) {
-//       ScaffoldMessenger.of(
-//         context,
-//       ).showSnackBar(const SnackBar(content: Text('Please choose a reason')));
-//       return;
-//     }
-//     setState(() => _busy = true);
-//     try {
-//       if (widget.callId.isNotEmpty) {
-//         await context.read<CallRepository>().reportCall(
-//           widget.callId,
-//           reason: _reason!.api,
-//           description: _description.text,
-//         );
-//       } else {
-//         await context.read<ProfileRepository>().reportUser(
-//           widget.peerId,
-//           reason: _reason!.api,
-//           description: _description.text,
-//         );
-//       }
-//       if (!mounted) return;
-//       Navigator.of(context).pop();
-//       ScaffoldMessenger.of(context).showSnackBar(
-//         const SnackBar(content: Text('Report submitted. Thank you.')),
-//       );
-//     } on Exception catch (e) {
-//       if (!mounted) return;
-//       ScaffoldMessenger.of(
-//         context,
-//       ).showSnackBar(SnackBar(content: Text('Failed to submit: $e')));
-//     } finally {
-//       if (mounted) setState(() => _busy = false);
-//     }
-//   }
-
-//   @override
-//   Widget build(BuildContext context) {
-//     final theme = Theme.of(context);
-//     return Padding(
-//       padding: EdgeInsets.only(
-//         left: 24,
-//         right: 24,
-//         top: 24,
-//         bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-//       ),
-//       child: Column(
-//         mainAxisSize: MainAxisSize.min,
-//         crossAxisAlignment: CrossAxisAlignment.stretch,
-//         children: [
-//           Text(
-//             'Report this conversation',
-//             style: theme.textTheme.titleLarge?.copyWith(
-//               fontWeight: FontWeight.w800,
-//             ),
-//           ),
-//           const SizedBox(height: 6),
-//           Text(
-//             'Our moderation team reviews every report.',
-//             style: theme.textTheme.bodyMedium?.copyWith(
-//               color: theme.colorScheme.outline,
-//             ),
-//           ),
-//           const SizedBox(height: 18),
-//           Wrap(
-//             spacing: 8,
-//             runSpacing: 8,
-//             children:
-//                 ReportReason.values
-//                     .map(
-//                       (r) => ChoiceChip(
-//                         label: Text(r.label),
-//                         selected: _reason == r,
-//                         onSelected: (_) => setState(() => _reason = r),
-//                       ),
-//                     )
-//                     .toList(),
-//           ),
-//           const SizedBox(height: 14),
-//           TextField(
-//             controller: _description,
-//             maxLines: 3,
-//             maxLength: 1000,
-//             decoration: const InputDecoration(
-//               labelText: 'Anything else? (optional)',
-//               alignLabelWithHint: true,
-//             ),
-//           ),
-//           const SizedBox(height: 8),
-//           LoadingButton(
-//             label: 'Submit report',
-//             loading: _busy,
-//             onPressed: _submit,
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-// }
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
+import 'package:peerup/core/config/app_routes.dart';
+import 'package:peerup/core/widgets/user_avatar.dart';
+import 'package:peerup/features/call/cubit/call_cubit.dart';
+import 'package:peerup/features/call/cubit/call_state.dart';
+import 'package:peerup/features/friends/bloc/friends_cubit.dart';
+import 'package:peerup/features/matchmaking/cubit/matchmaking_cubit.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/call/call_repository.dart';
-import '../../core/config/app_routes.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/widgets/loading_button.dart';
-import '../../models/enums.dart';
-import '../matchmaking/cubit/matchmaking_cubit.dart';
-import '../profile/profile_repository.dart';
-import 'cubit/call_cubit.dart';
-import 'cubit/call_state.dart';
+import 'package:peerup/core/config/app_routes.dart';
+import 'package:peerup/features/call/cubit/call_cubit.dart';
+import 'package:peerup/features/call/cubit/call_state.dart';
+import 'package:peerup/features/matchmaking/cubit/matchmaking_cubit.dart';
 
 class CallEndScreen extends StatefulWidget {
   const CallEndScreen({super.key});
@@ -307,635 +25,589 @@ class CallEndScreen extends StatefulWidget {
 }
 
 class _CallEndScreenState extends State<CallEndScreen> {
+  // Colors matched to MatchHomeScreen's dark theme.
+  static const Color primary = Color(0xFF9B8CFF);
+  static const Color backgroundColor = Color(0xFF0B1020);
+  static const Color surfaceColor = Color(0xFF151B30);
+  static const Color textColor = Color(0xFFF5F6FF);
+  static const Color mutedColor = Color(0xFF9AA5C4);
+  static const Color borderColor = Color(0xFF303951);
+  static const Color selectedColor = Color(0xFF252143);
+  static const Color premiumColor = Color(0xFFFFD28B);
+
   final Set<String> _selectedFeedback = {};
 
+  String? _selectedReaction;
   bool _addToFriends = false;
+  bool _isSubmitting = false;
 
   final List<_FeedbackOption> _feedbackOptions = const [
-    _FeedbackOption(
-      id: 'friendly',
-      label: 'Friendly',
-      icon: Icons.sentiment_satisfied_alt_rounded,
-    ),
-    _FeedbackOption(
-      id: 'excellent_speaker',
-      label: 'Excellent speaker',
-      icon: Icons.record_voice_over_rounded,
-    ),
-    _FeedbackOption(
-      id: 'good_listener',
-      label: 'Good listener',
-      icon: Icons.hearing_rounded,
-    ),
-    _FeedbackOption(
-      id: 'easy_to_talk',
-      label: 'Easy to talk to',
-      icon: Icons.chat_bubble_outline_rounded,
-    ),
-    _FeedbackOption(
-      id: 'helpful',
-      label: 'Helpful',
-      icon: Icons.volunteer_activism_rounded,
-    ),
-    _FeedbackOption(
-      id: 'funny',
-      label: 'Funny',
-      icon: Icons.emoji_emotions_outlined,
-    ),
-    _FeedbackOption(
-      id: 'confident_speaker',
-      label: 'Confident speaker',
-      icon: Icons.mic_none_rounded,
-    ),
-    _FeedbackOption(
-      id: 'great_conversation',
-      label: 'Great conversation',
-      icon: Icons.star_outline_rounded,
-    ),
+    _FeedbackOption('Friendly', Icons.sentiment_satisfied_alt),
+    _FeedbackOption('Excellent speaker', Icons.record_voice_over),
+    _FeedbackOption('Good listener', Icons.hearing),
+    _FeedbackOption('Easy to talk to', Icons.chat_bubble_outline),
+    _FeedbackOption('Helpful', Icons.volunteer_activism),
+    _FeedbackOption('Funny', Icons.sentiment_satisfied),
+    _FeedbackOption('Confident speaker', Icons.mic_none),
+    _FeedbackOption('Great conversation', Icons.star_border),
   ];
 
-  @override
-  void initState() {
-    super.initState();
-
-    Future.microtask(() {
-      if (!mounted) return;
-      context.read<CallCubit>().reset();
-    });
-  }
-
-  Future<void> _goHome() async {
-    context.read<MatchmakingCubit>().reset();
-    context.go(AppRoutes.homeMatch);
-  }
-
-  Future<void> _showReportSheet() async {
-    final match = context.read<MatchmakingCubit>().state.match;
-    final peer = match?.peer;
-
-    if (peer == null) return;
-
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder:
-          (context) => _ReportSheet(peerId: peer.id, callId: match!.callId),
-    );
-  }
-
-  void _toggleFeedback(String id) {
-    setState(() {
-      if (_selectedFeedback.contains(id)) {
-        _selectedFeedback.remove(id);
-      } else {
-        _selectedFeedback.add(id);
-      }
-    });
-  }
-
-  void _toggleAddFriend() {
-    setState(() {
-      _addToFriends = !_addToFriends;
-    });
-  }
+  bool get _hasSelection =>
+      _selectedReaction != null ||
+      _selectedFeedback.isNotEmpty ||
+      _addToFriends;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final peer = context.watch<MatchmakingCubit>().state.match?.peer;
+    final match = context.read<MatchmakingCubit>().state.match;
 
-    return BlocBuilder<CallCubit, CallState>(
-      builder: (context, state) {
-        final match = context.read<MatchmakingCubit>().state.match;
-        final peer = match?.peer;
-
-        return Scaffold(
-          backgroundColor: Colors.white,
-          body: SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 28),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+    final callState = context.watch<CallCubit>().state;
+    final elapsedSeconds = callState.elapsedSeconds;
+    final peerName = match?.peer.name ?? 'Partner';
+    final bio = match?.peer.bio ?? 'Partner';
+    return Theme(
+      data: Theme.of(context).copyWith(
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: backgroundColor,
+        colorScheme: Theme.of(context).colorScheme.copyWith(
+          brightness: Brightness.dark,
+          primary: primary,
+          surface: surfaceColor,
+        ),
+        textTheme: Theme.of(
+          context,
+        ).textTheme.apply(bodyColor: textColor, displayColor: textColor),
+      ),
+      child: Scaffold(
+        backgroundColor: backgroundColor,
+        body: SafeArea(
+          child: BlocBuilder<CallCubit, CallState>(
+            builder: (context, state) {
+              return Column(
                 children: [
-                  // ======================================================
-                  // SUCCESS ICON
-                  // ======================================================
-                  const SizedBox(height: 8),
-
-                  Center(
-                    child: Container(
-                      width: 68,
-                      height: 68,
-                      decoration: BoxDecoration(
-                        color: AppColors.success.withValues(alpha: 0.10),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.check_rounded,
-                        size: 38,
-                        color: AppColors.success,
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  Text(
-                    'Call finished',
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: Colors.black,
-                    ),
-                  ),
-
-                  const SizedBox(height: 6),
-
-                  Text(
-                    'Nice job staying in the conversation!',
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: Colors.black54,
-                    ),
-                  ),
-
-                  // ======================================================
-                  // PEER
-                  // ======================================================
-                  if (peer != null) ...[
-                    const SizedBox(height: 22),
-
-                    Center(
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(22, 20, 22, 24),
                       child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          CircleAvatar(
-                            radius: 30,
-                            backgroundColor: const Color(0xFFF0F0F0),
-                            backgroundImage:
-                                peer.avatar != null && peer.avatar!.isNotEmpty
-                                    ? NetworkImage(peer.avatar!)
-                                    : null,
-                            child:
-                                peer.avatar == null || peer.avatar!.isEmpty
-                                    ? Text(
-                                      peer.name.isNotEmpty
-                                          ? peer.name[0].toUpperCase()
-                                          : '?',
-                                      style: const TextStyle(
-                                        fontSize: 22,
-                                        fontWeight: FontWeight.w700,
-                                        color: Color(0xFF666666),
-                                      ),
-                                    )
-                                    : null,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            peer.name,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
+                          const SizedBox(height: 6),
+
+                          Center(
+                            child: _buildProfileImage(
+                              match?.peer.avatar,
+                              peerName,
                             ),
                           ),
+
+                          // CallProfile(
+                          //   url: match?.peer.avatar,
+                          //   name: peerName,
+                          //   bio: bio,
+                          //   radius: 52,
+                          // ),
+                          const SizedBox(height: 24),
+
+                          const Text(
+                            'Call ended',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w700,
+                              color: textColor,
+                            ),
+                          ),
+
+                          const SizedBox(height: 8),
+
+                          Text(
+                            peer?.name ?? 'Your conversation partner',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w500,
+                              color: textColor,
+                            ),
+                          ),
+
+                          // Center(
+                          //   child: Container(
+                          //     padding: const EdgeInsets.symmetric(
+                          //       horizontal: 18,
+                          //       vertical: 12,
+                          //     ),
+                          //     decoration: BoxDecoration(
+                          //       color: surfaceColor,
+                          //       borderRadius: BorderRadius.circular(30),
+                          //       border: Border.all(color: borderColor),
+                          //     ),
+                          //     child: Row(
+                          //       mainAxisSize: MainAxisSize.min,
+                          //       children: [
+                          //         const Icon(
+                          //           Icons.access_time,
+                          //           color: primary,
+                          //           size: 20,
+                          //         ),
+                          //         const SizedBox(width: 10),
+
+                          //         Text(
+                          //           'Call duration: '
+                          //           '${_formatDuration(elapsedSeconds)}',
+                          //           style: const TextStyle(
+                          //             fontSize: 15,
+                          //             fontWeight: FontWeight.w600,
+                          //             color: textColor,
+                          //           ),
+                          //         ),
+                          //       ],
+                          //     ),
+                          //   ),
+                          // ),
+                          const SizedBox(height: 36),
+
+                          const Text(
+                            'Would you like to connect again?',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w600,
+                              color: textColor,
+                            ),
+                          ),
+                          _buildFriendToggle(name: peer?.name ?? 'this person'),
+
+                          const SizedBox(height: 20),
+
+                          _buildReactionButtons(),
+
+                          const SizedBox(height: 28),
+
+                          const SizedBox(height: 18),
+
+                          Wrap(
+                            spacing: 10,
+                            runSpacing: 12,
+                            alignment: WrapAlignment.center,
+                            children:
+                                _feedbackOptions
+                                    .map(_buildFeedbackChip)
+                                    .toList(),
+                          ),
+
+                          const SizedBox(height: 28),
                         ],
                       ),
                     ),
-                  ],
-
-                  const SizedBox(height: 24),
-
-                  // ======================================================
-                  // CALL DURATION
-                  // ======================================================
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF8F8FA),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 38,
-                          height: 38,
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.10),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            Icons.timer_outlined,
-                            size: 20,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: Text(
-                            'Call duration',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        Text(
-                          _format(state.elapsedSeconds),
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ],
-                    ),
                   ),
 
-                  const SizedBox(height: 28),
-
-                  // ======================================================
-                  // FEEDBACK TITLE
-                  // ======================================================
-                  const Text(
-                    'How was your conversation?',
-                    style: TextStyle(
-                      fontSize: 19,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.black,
-                    ),
-                  ),
-
-                  const SizedBox(height: 6),
-
-                  const Text(
-                    'Select everything that describes your conversation.',
-                    style: TextStyle(fontSize: 13, color: Colors.black54),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // ======================================================
-                  // MULTI SELECT FEEDBACK
-                  // ======================================================
-                  Wrap(
-                    spacing: 9,
-                    runSpacing: 10,
-                    children:
-                        _feedbackOptions.map((option) {
-                          final selected = _selectedFeedback.contains(
-                            option.id,
-                          );
-
-                          return _FeedbackChip(
-                            option: option,
-                            selected: selected,
-                            onTap: () {
-                              _toggleFeedback(option.id);
-                            },
-                          );
-                        }).toList(),
-                  ),
-
-                  const SizedBox(height: 28),
-
-                  // ======================================================
-                  // ADD FRIEND
-                  // ======================================================
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF8F8FA),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color:
-                            _addToFriends
-                                ? AppColors.primary
-                                : Colors.transparent,
-                        width: 1.2,
-                      ),
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 42,
-                              height: 42,
-                              decoration: BoxDecoration(
-                                color: AppColors.primary.withValues(
-                                  alpha: 0.10,
-                                ),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                _addToFriends
-                                    ? Icons.person_add_rounded
-                                    : Icons.people_outline_rounded,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            const Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Talk again in the future?',
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  SizedBox(height: 3),
-                                  Text(
-                                    'Add this person to your friends.',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.black54,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Switch.adaptive(
-                              value: _addToFriends,
-                              activeColor: AppColors.primary,
-                              onChanged: (_) {
-                                _toggleAddFriend();
-                              },
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 28),
-
-                  // ======================================================
-                  // REPORT
-                  // ======================================================
-                  OutlinedButton.icon(
-                    onPressed: _showReportSheet,
-                    icon: const Icon(Icons.flag_outlined),
-                    label: const Text('Report the peer'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.danger,
-                      side: BorderSide(
-                        color: AppColors.danger.withValues(alpha: 0.5),
-                      ),
-                      minimumSize: const Size.fromHeight(48),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // ======================================================
-                  // BACK HOME
-                  // ======================================================
-                  LoadingButton(label: 'Back to home', onPressed: _goHome),
-
-                  const SizedBox(height: 8),
+                  _buildBottomActions(),
                 ],
-              ),
-            ),
+              );
+            },
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
-  String _format(int seconds) {
-    final m = (seconds ~/ 60).toString().padLeft(2, '0');
-    final s = (seconds % 60).toString().padLeft(2, '0');
+  Widget _buildProfileImage(String? avatar, String? name) {
+    final initials =
+        name != null && name.trim().isNotEmpty
+            ? name.trim()[0].toUpperCase()
+            : '?';
 
-    return '$m:$s';
+    return Container(
+      width: 112,
+      height: 112,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: selectedColor,
+        border: Border.all(color: primary.withValues(alpha: 0.45), width: 2),
+      ),
+      child: ClipOval(
+        child:
+            avatar != null && avatar.trim().isNotEmpty
+                ? Image.network(
+                  avatar,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => _fallbackAvatar(initials),
+                )
+                : _fallbackAvatar(initials),
+      ),
+    );
   }
-}
 
-// ======================================================================
-// FEEDBACK OPTION
-// ======================================================================
+  Widget _fallbackAvatar(String initials) {
+    return Container(
+      color: selectedColor,
+      alignment: Alignment.center,
+      child: Text(
+        initials,
+        style: const TextStyle(
+          color: primary,
+          fontSize: 42,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
 
-class _FeedbackOption {
-  const _FeedbackOption({
-    required this.id,
-    required this.label,
-    required this.icon,
-  });
-
-  final String id;
-  final String label;
-  final IconData icon;
-}
-
-// ======================================================================
-// FEEDBACK CHIP
-// ======================================================================
-
-class _FeedbackChip extends StatelessWidget {
-  const _FeedbackChip({
-    required this.option,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final _FeedbackOption option;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOut,
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
-        decoration: BoxDecoration(
-          color:
-              selected
-                  ? AppColors.primary.withValues(alpha: 0.10)
-                  : Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: selected ? AppColors.primary : const Color(0xFFE0E0E0),
-            width: selected ? 1.4 : 1,
+  Widget _buildReactionButtons() {
+    return Row(
+      children: [
+        Expanded(
+          child: _buildReactionButton(
+            label: 'Like',
+            value: 'like',
+            icon: Icons.thumb_up_outlined,
           ),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              option.icon,
-              size: 17,
-              color: selected ? AppColors.primary : const Color(0xFF666666),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildReactionButton(
+            label: 'Dislike',
+            value: 'dislike',
+            icon: Icons.thumb_down_outlined,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildReactionButton({
+    required String label,
+    required String value,
+    required IconData icon,
+  }) {
+    final selected = _selectedReaction == value;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          setState(() {
+            _selectedReaction = selected ? null : value;
+          });
+        },
+        borderRadius: BorderRadius.circular(18),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          height: 50,
+          decoration: BoxDecoration(
+            color: selected ? selectedColor : surfaceColor,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: selected ? primary : borderColor,
+              width: selected ? 2 : 1,
             ),
-            const SizedBox(width: 7),
-            Text(
-              option.label,
-              style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                color: selected ? AppColors.primary : const Color(0xFF444444),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 27, color: selected ? primary : mutedColor),
+              SizedBox(width: 20),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                  color: selected ? primary : textColor,
+                ),
               ),
-            ),
-            if (selected) ...[
-              const SizedBox(width: 5),
-              Icon(Icons.check_rounded, size: 15, color: AppColors.primary),
             ],
-          ],
+          ),
         ),
       ),
     );
   }
-}
 
-// ======================================================================
-// REPORT SHEET
-// ======================================================================
+  Widget _buildFeedbackChip(_FeedbackOption option) {
+    final selected = _selectedFeedback.contains(option.label);
 
-class _ReportSheet extends StatefulWidget {
-  const _ReportSheet({required this.peerId, required this.callId});
-
-  final String peerId;
-  final String callId;
-
-  @override
-  State<_ReportSheet> createState() => _ReportSheetState();
-}
-
-class _ReportSheetState extends State<_ReportSheet> {
-  ReportReason? _reason;
-
-  final _description = TextEditingController();
-
-  bool _busy = false;
-
-  @override
-  void dispose() {
-    _description.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    if (_reason == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Please choose a reason')));
-      return;
-    }
-
-    setState(() => _busy = true);
-
-    try {
-      if (widget.callId.isNotEmpty) {
-        await context.read<CallRepository>().reportCall(
-          widget.callId,
-          reason: _reason!.api,
-          description: _description.text,
-        );
-      } else {
-        await context.read<ProfileRepository>().reportUser(
-          widget.peerId,
-          reason: _reason!.api,
-          description: _description.text,
-        );
-      }
-
-      if (!mounted) return;
-
-      Navigator.of(context).pop();
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Report submitted. Thank you.')),
-      );
-    } on Exception catch (e) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to submit: $e')));
-    } finally {
-      if (mounted) {
-        setState(() => _busy = false);
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 24,
-        right: 24,
-        top: 24,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(30),
+        onTap: () {
+          setState(() {
+            if (selected) {
+              _selectedFeedback.remove(option.label);
+            } else {
+              _selectedFeedback.add(option.label);
+            }
+          });
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          decoration: BoxDecoration(
+            color: selected ? selectedColor : surfaceColor,
+            borderRadius: BorderRadius.circular(30),
+            border: Border.all(
+              color: selected ? primary : borderColor,
+              width: selected ? 1.1 : 1,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                option.icon,
+                size: 19,
+                color: selected ? primary : mutedColor,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                option.label,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                  color: selected ? primary : textColor,
+                ),
+              ),
+              if (selected) ...[
+                const SizedBox(width: 6),
+                const Icon(Icons.check_circle, size: 17, color: primary),
+              ],
+            ],
+          ),
+        ),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+    );
+  }
+
+  Widget _buildFriendToggle({required String name}) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _addToFriends ? selectedColor : surfaceColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: _addToFriends ? primary : borderColor,
+          width: _addToFriends ? 1.5 : 1,
+        ),
+      ),
+      child: Row(
         children: [
-          Text(
-            'Report this conversation',
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w800,
+          Container(
+            width: 50,
+            height: 50,
+            decoration: const BoxDecoration(
+              color: selectedColor,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.person_add_alt_1, color: primary, size: 25),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Talk again in the future?',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: textColor,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  _addToFriends
+                      ? 'Connect with $name.'
+                      : 'Add this person to your friends.',
+                  style: const TextStyle(fontSize: 13, color: mutedColor),
+                ),
+              ],
             ),
           ),
+          Switch.adaptive(
+            value: _addToFriends,
+            activeTrackColor: primary,
 
-          const SizedBox(height: 6),
-
-          Text(
-            'Our moderation team reviews every report.',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.outline,
-            ),
-          ),
-
-          const SizedBox(height: 18),
-
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children:
-                ReportReason.values
-                    .map(
-                      (r) => ChoiceChip(
-                        label: Text(r.label),
-                        selected: _reason == r,
-                        onSelected: (_) {
-                          setState(() {
-                            _reason = r;
-                          });
-                        },
-                      ),
-                    )
-                    .toList(),
-          ),
-
-          const SizedBox(height: 14),
-
-          TextField(
-            controller: _description,
-            maxLines: 3,
-            maxLength: 1000,
-            decoration: const InputDecoration(
-              labelText: 'Anything else? (optional)',
-              alignLabelWithHint: true,
-            ),
-          ),
-
-          const SizedBox(height: 8),
-
-          LoadingButton(
-            label: 'Submit report',
-            loading: _busy,
-            onPressed: _submit,
+            onChanged: (value) {
+              setState(() {
+                _addToFriends = value;
+              });
+            },
           ),
         ],
       ),
     );
   }
+
+  Widget _buildBottomActions() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+      decoration: const BoxDecoration(
+        color: backgroundColor,
+        border: Border(top: BorderSide(color: borderColor)),
+      ),
+      child: Column(
+        children: [
+          SizedBox(
+            width: double.infinity,
+            height: 58,
+            child: ElevatedButton(
+              onPressed:
+                  _hasSelection && !_isSubmitting ? _submitFeedback : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primary,
+                disabledBackgroundColor: surfaceColor,
+                foregroundColor: backgroundColor,
+                disabledForegroundColor: mutedColor,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              child:
+                  _isSubmitting
+                      ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: backgroundColor,
+                        ),
+                      )
+                      : const Text(
+                        'Submit feedback',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: _isSubmitting ? null : _skip,
+            child: const Text(
+              'Skip and go home',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: mutedColor,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Future<void> _submitFeedback() async {
+  //   if (!_hasSelection || _isSubmitting) return;
+
+  //   setState(() {
+  //     _isSubmitting = true;
+  //   });
+
+  //   try {
+
+  //     if (!mounted) return;
+
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       const SnackBar(
+  //         content: Text(
+  //           'Feedback selected. Connect the API to save your response.',
+  //         ),
+  //       ),
+  //     );
+  //   } catch (error) {
+  //     if (!mounted) return;
+
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       SnackBar(content: Text('Unable to submit feedback: $error')),
+  //     );
+  //   } finally {
+  //     if (mounted) {
+  //       setState(() {
+  //         _isSubmitting = false;
+  //       });
+  //     }
+  //   }
+  // }
+
+  Future<void> _submitFeedback() async {
+    if (!_hasSelection || _isSubmitting) return;
+
+    final match = context.read<MatchmakingCubit>().state.match;
+    final receiverId = match?.peer.id;
+
+    if (receiverId == null || receiverId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Unable to identify your conversation partner.'),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      final response = await context.read<FriendsCubit>().submitCallFeedback(
+        receiverId: receiverId,
+        reaction: _selectedReaction,
+        feedback: _selectedFeedback.toList(),
+        addToFriends: _addToFriends,
+        connectAgain: false,
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            response is Map && response['message'] is String
+                ? response['message'] as String
+                : 'Feedback submitted successfully.',
+          ),
+        ),
+      );
+
+      context.read<MatchmakingCubit>().reset();
+      context.go(AppRoutes.homeMatch);
+    } catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to submit feedback: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
+  }
+
+  void _skip() {
+    context.read<MatchmakingCubit>().reset();
+    context.go(AppRoutes.homeMatch);
+  }
+
+  String _formatDuration(int seconds) {
+    final minutes = seconds ~/ 60;
+    final remainingSeconds = seconds % 60;
+
+    return '${minutes.toString().padLeft(2, '0')}:'
+        '${remainingSeconds.toString().padLeft(2, '0')}';
+  }
+}
+
+class _FeedbackOption {
+  final String label;
+  final IconData icon;
+
+  const _FeedbackOption(this.label, this.icon);
 }

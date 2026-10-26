@@ -533,6 +533,7 @@ class CallService {
   // ---------------------------------------------------------------------------
 
   Future<void> hangUp() async {
+    
     final callId = _callId;
 
     if (callId != null && _callActive) {

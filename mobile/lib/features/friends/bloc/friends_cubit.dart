@@ -67,6 +67,50 @@ class FriendsCubit extends Cubit<LoadState<List<Friend>>> {
 
   Future<void> refresh() => load();
 
+
+  // Future<void> sendFriendRequest() async
+  //  {
+  //   emit(const LoadState.loading());
+  //   try {
+  //     var data={};
+  //     final page = await _repo.sendFriendRequest(
+  //     data
+  //     );
+  //     final items = _dedupe(page.items);
+  //     emit(LoadState.data(items));
+  //   } catch (e) 
+  //   {
+  //     if (isClosed) return;
+  //     emit(LoadState.error(e));
+  //   }
+  // }
+
+Future<dynamic> submitCallFeedback({
+  required String receiverId,
+ required String? reaction,
+  required List<String> feedback,
+  required bool addToFriends,
+  required bool connectAgain,
+}) async {
+  final response = await _repo.sendFriendRequest(
+    receiverId: receiverId,
+    reaction: reaction,
+    feedback: feedback,
+    addToFriends: addToFriends,
+    connectAgain: connectAgain,
+  );
+
+  // Refresh accepted friends after submitting the request.
+  // Pending requests will not appear in the accepted-friends list.
+  if (addToFriends && !isClosed) {
+    await load();
+  }
+
+  return response;
+}
+  
+  
+  
   /// Refresh when a friendship is created or accepted.
   ///
   /// We deliberately re-fetch from the backend (source of truth) instead of

@@ -7,12 +7,7 @@ import '../network/api_exception.dart';
 import 'auth_repository.dart';
 import 'token_manager.dart';
 
-/// Application-level auth orchestration.
-///
-/// Talks to [AuthRepository] for login/register/logout and to [TokenManager]
-/// for credential persistence + refreshing. Installing the refresh callback on
-/// the [TokenManager] keeps the dependency acyclic
-/// (AuthService -> TokenManager -> refresher -> AuthService -> HTTP).
+
 class AuthService {
   AuthService({required AuthRepository repo, required TokenManager tokens})
     : _repo = repo,
@@ -88,7 +83,7 @@ class AuthService {
   /// persisted session) only when the server definitively refuses the refresh
   /// token (401); transient network errors leave the stored tokens in place.
   Future<String?> _refresh(String refreshToken) async {
-    debugPrint('[AUTH] refreshing token');
+
     try {
       final access = await _repo.refresh(refreshToken);
       if (access == null || access.isEmpty) {
