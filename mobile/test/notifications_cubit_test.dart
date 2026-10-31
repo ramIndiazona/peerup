@@ -20,6 +20,20 @@ Map<String, dynamic> _row(
   'createdAt': DateTime.now().toIso8601String(),
 };
 
+Map<String, dynamic> _friendRequestRow(String id, String requestId) => {
+  'id': id,
+  'type': 'SYSTEM',
+  'title': 'Friend request',
+  'body': 'Alex wants to add you as a friend.',
+  'data': {
+    'kind': 'FRIEND_REQUEST',
+    'requestId': requestId,
+    'senderId': 'u1',
+  },
+  'readAt': null,
+  'createdAt': DateTime.now().toIso8601String(),
+};
+
 void main() {
   late StubApiClient api;
   late NotificationsCubit cubit;
@@ -135,6 +149,47 @@ void main() {
 
     expect(patched, 2);
     expect(cubit.state.unreadCount, 0);
+  });
+
+  test('accepts a friend request notification and resolves its action', () async {
+    api.onGet =
+        (path, query) async => {
+          'items': [_friendRequestRow('n1', 'req-1')],
+          'total': 1,
+        };
+    api.onPost = (path, data) async => {'status': 'FRIENDS'};
+
+    await cubit.load();
+    final notification = cubit.state.items.single;
+
+    final ok = await cubit.acceptFriendRequest(notification);
+
+    expect(ok, isTrue);
+    expect(api.calls.last.method, 'POST');
+    expect(api.calls.last.path, 'friend-requests/req-1/accept');
+    expect(
+      cubit.state.items.single.data?['kind'],
+      'FRIEND_REQUEST_ACCEPTED',
+    );
+    expect(cubit.state.items.single.isRead, isTrue);
+  });
+
+  test('keeps the notification action when accepting fails', () async {
+    api.onGet =
+        (path, query) async => {
+          'items': [_friendRequestRow('n1', 'req-1')],
+          'total': 1,
+        };
+    api.onPost = (path, data) async {
+      throw const ApiException('HTTP_500', 'boom', statusCode: 500);
+    };
+
+    await cubit.load();
+    final ok = await cubit.acceptFriendRequest(cubit.state.items.single);
+
+    expect(ok, isFalse);
+    expect(cubit.state.items.single.data?['kind'], 'FRIEND_REQUEST');
+    expect(cubit.state.error, isA<ApiException>());
   });
 
   test('reconnect reloads the list to pick up missed notifications', () async {

@@ -29,9 +29,10 @@ class APIURL {
   static String notificationMarkRead(String id) => 'notifications/$id/read';
   static const String notificationsDeviceToken = 'notifications/device-token';
 
-
   static const String addfriends = 'friend-requests';
   static const String callFeedback = 'call-feedback';
+  static String acceptFriendRequest(String requestId) =>
+      'friend-requests/$requestId/accept';
 
   static const String friendsList = 'friend-requests/friends';
 
@@ -53,6 +54,8 @@ class APIURL {
   static const String subscriptionsMe = 'subscriptions/me';
   static const String subscriptionsUsage = 'subscriptions/usage';
   static const String subscriptionsPurchase = 'subscriptions/purchase';
+  static const String subscriptionsVerifyPayment =
+      'subscriptions/verify-payment';
   static const String subscriptionsCancel = 'subscriptions/cancel';
 
   static String callDetails(String callId) => 'calls/$callId';

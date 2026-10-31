@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/config/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/async_content.dart';
+import '../../../features/premium/bloc/premium_cubit.dart';
 import '../../../models/ai.dart';
 import '../bloc/ai_catalog_cubit.dart';
 import '../bloc/ai_session_cubit.dart';
@@ -37,6 +38,27 @@ class _AIModesScreenState extends State<AIModesScreen> {
   }) async {
     try {
       final characters = context.read<AICatalogCubit>().state.characters.value;
+
+      // Premium characters are a restricted feature: gate them behind an
+      // active subscription and offer the subscription screen otherwise.
+      if (characterId != null) {
+        AICharacter? character;
+        for (final c in (characters ?? const [])) {
+          if (c.id == characterId) {
+            character = c;
+            break;
+          }
+        }
+        if (character != null && character.isPremium) {
+          final status = context.read<PremiumCubit>().state.status.value;
+          if (status == null || !status.isPremiumActive) {
+            if (!context.mounted) return;
+            context.push(AppRoutes.subscription);
+            return;
+          }
+        }
+      }
+
       await context.read<AISessionCubit>().start(
         characterId: characterId,
         scenario: scenario,
@@ -123,8 +145,7 @@ class _AIModesScreenState extends State<AIModesScreen> {
                     ),
               ),
               const SizedBox(height: 24),
-             
-             
+
               Text(
                 'Try a scenario',
                 style: theme.textTheme.titleMedium?.copyWith(

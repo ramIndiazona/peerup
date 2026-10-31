@@ -1,296 +1,4 @@
-// import { Injectable, Logger } from "@nestjs/common";
-// import { ConfigService } from "@nestjs/config";
-// import { RedisService } from "../redis/redis.service";
-// import { RealtimeEventsService } from "../realtime/realtime-events.service";
-// import { PrismaService } from "../prisma/prisma.service";
 
-// export enum PresenceStatus {
-//   OFFLINE = "OFFLINE",
-//   AVAILABLE = "AVAILABLE",
-//   SEARCHING = "SEARCHING",
-//   MATCHED = "MATCHED",
-//   CONNECTING = "CONNECTING",
-//   IN_CALL = "IN_CALL",
-//   ENDING = "ENDING",
-// }
-
-// export interface Presence {
-//   userId: string;
-//   status: PresenceStatus;
-//   socketId: string;
-//   lastHeartbeat: number;
-//   availableSince: number | null;
-//   currentCallId: string | null;
-//   lastActiveAt: number;
-// }
-
-// const PRESENCE_KEY_PREFIX = "presence:user:";
-// const LIVE_SET = "live:users";
-// const LIVE_COUNT_KEY = "live:count";
-
-// /**
-//  * Single source of truth for presence.
-//  *
-//  * State lives in Redis (through RedisService) so multiple backend instances
-//  * agree on who is live. Whenever the live set membership changes we broadcast
-//  * the current LIVE_USERS snapshot so every connected client updates without
-//  * polling.
-//  */
-// @Injectable()
-// export class PresenceService {
-//   private readonly logger = new Logger(PresenceService.name);
-//   private readonly heartbeatTimeoutSeconds: number;
-
-//   constructor(
-//     private readonly redis: RedisService,
-//     config: ConfigService,
-//     private readonly events: RealtimeEventsService,
-//     private readonly prisma: PrismaService,
-//   ) {
-//     this.heartbeatTimeoutSeconds = config.get<number>(
-//       "heartbeat.timeoutSeconds",
-//       45,
-//     );
-//   }
-
-//   private presenceKey(userId: string): string {
-//     return `${PRESENCE_KEY_PREFIX}${userId}`;
-//   }
-
-//   private presenceTtl(): number {
-//     return this.heartbeatTimeoutSeconds * 4;
-//   }
-
-//   private isLiveStatus(status: PresenceStatus | undefined): boolean {
-//     return (
-//       status === PresenceStatus.AVAILABLE || status === PresenceStatus.SEARCHING
-//     );
-//   }
-
-//   async upsert(userId: string, data: Partial<Presence>): Promise<Presence> {
-//     const existing = (await this.redis.getJson<Presence>(
-//       this.presenceKey(userId),
-//     )) ?? {
-//       userId,
-//       status: PresenceStatus.OFFLINE,
-//       socketId: "",
-//       lastHeartbeat: 0,
-//       availableSince: null,
-//       currentCallId: null,
-//       lastActiveAt: Date.now(),
-//     };
-
-//     const next: Presence = {
-//       ...existing,
-//       ...data,
-//       userId,
-//       lastHeartbeat: Date.now(),
-//       lastActiveAt: Date.now(),
-//     };
-
-//     await this.redis.setJson(
-//       this.presenceKey(userId),
-//       next,
-//       this.presenceTtl(),
-//     );
-
-//     // Keep the "live users" set in sync with availability.
-//     const isLive = this.isLiveStatus(next.status);
-//     const wasLive = this.isLiveStatus(existing.status);
-
-//     if (isLive && !wasLive) {
-//       const added = await this.redis.sadd(LIVE_SET, userId);
-//       if (added === 1) await this.redis.incr(LIVE_COUNT_KEY);
-//       void this.broadcastLiveUsers();
-//     } else if (!isLive && wasLive) {
-//       const removed = await this.redis.srem(LIVE_SET, userId);
-//       if (removed === 1) await this.redis.decr(LIVE_COUNT_KEY);
-//       void this.broadcastLiveUsers();
-//     }
-
-//     return next;
-//   }
-
-//   async availability(
-//     userId: string,
-//     available: boolean,
-//     socketId = "",
-//   ): Promise<Presence> {
-//     return this.upsert(userId, {
-//       socketId,
-//       status: available ? PresenceStatus.AVAILABLE : PresenceStatus.OFFLINE,
-//       availableSince: available ? Date.now() : null,
-//       currentCallId: null,
-//     });
-//   }
-
-//   async get(userId: string): Promise<Presence | null> {
-//     return this.redis.getJson<Presence>(this.presenceKey(userId));
-//   }
-
-//   async require(userId: string): Promise<Presence> {
-//     const p = await this.get(userId);
-//     if (!p) {
-//       throw new Error(`NO_PRESENCE:${userId}`);
-//     }
-//     return p;
-//   }
-
-//   async getLiveCount(): Promise<number> {
-//     const raw = await this.redis.get(LIVE_COUNT_KEY);
-//     return raw ? parseInt(raw, 10) : 0;
-//   }
-
-//   async listLiveUserIds(): Promise<string[]> {
-//     return this.redis.smembers(LIVE_SET);
-//   }
-
-//   async isHealthy(userId: string): Promise<boolean> {
-//     const p = await this.get(userId);
-//     if (!p) return false;
-//     return Date.now() - p.lastHeartbeat <= this.heartbeatTimeoutSeconds * 1000;
-//   }
-
-//   async heartbeat(userId: string, socketId: string): Promise<Presence | null> {
-//     return this.upsert(userId, { socketId });
-//   }
-
-//   async setCall(userId: string, callId: string | null): Promise<void> {
-//     await this.upsert(userId, {
-//       currentCallId: callId,
-//       status: callId ? PresenceStatus.IN_CALL : PresenceStatus.AVAILABLE,
-//       availableSince: callId ? null : Date.now(),
-//     });
-//   }
-
-//   async setEnding(userId: string): Promise<void> {
-//     await this.upsert(userId, { status: PresenceStatus.ENDING });
-//   }
-
-//   /**
-//    * Remove a user from presence entirely.
-//    *
-//    * Always attempts to remove the user from the live set, which is safe when
-//    * the membership is a ghost (presence key already expired): SREM returns 0
-//    * and we do not touch the counter when the member was not present.
-//    */
-//   async setOffline(userId: string): Promise<void> {
-//     const p = await this.get(userId);
-//     const wasLive = this.isLiveStatus(p?.status);
-//     const removed = await this.redis.srem(LIVE_SET, userId);
-//     if (removed === 1) await this.redis.decr(LIVE_COUNT_KEY);
-//     await this.redis.del(this.presenceKey(userId));
-//     if (removed === 1 || wasLive) {
-//       void this.broadcastLiveUsers();
-//     }
-//   }
-
-//   async sweepStale(): Promise<string[]> {
-//     // Honorary: prune any live membership whose presence has expired.
-//     const liveIds = await this.listLiveUserIds();
-//     let removed: string[] = [];
-//     await Promise.all(
-//       liveIds.map(async (id) => {
-//         const p = await this.get(id);
-//         if (
-//           !p ||
-//           Date.now() - p.lastHeartbeat > this.heartbeatTimeoutSeconds * 1000
-//         ) {
-//           await this.setOffline(id);
-//           removed.push(id);
-//         }
-//       }),
-//     );
-//     if (removed.length > 0) {
-//       this.logger.log(`Swept stale presence for ${removed.length} user(s)`);
-//     }
-//     return removed;
-//   }
-
-//   // Recompute the cached live count from the canonical set after drift.
-//   async reconcileLiveCount(): Promise<number> {
-//     const count = await this.redis.scard(LIVE_SET);
-//     await this.redis.set(LIVE_COUNT_KEY, String(count));
-//     return count;
-//   }
-
-//   /**
-//    * Build the LIVE_USERS snapshot and push it to every connected client.
-//    *
-//    * count is the TOTAL number of live users; the Flutter client subtracts
-//    * itself when it knows it is part of the list.
-//    */
-//   async broadcastLiveUsers(): Promise<void> {
-//     try {
-//       const liveIds = await this.listLiveUserIds();
-
-//       if (liveIds.length === 0) {
-//         await this.redis.set(LIVE_COUNT_KEY, "0");
-//         this.logger.log("[LIVE] broadcasting LIVE_USERS count=0");
-//         await this.events.broadcastLiveUsers(0, []);
-//         return;
-//       }
-
-//       const [users, presences] = await Promise.all([
-//         this.prisma.user.findMany({
-//           where: { id: { in: liveIds } },
-//           select: {
-//             id: true,
-//             profile: {
-//               select: {
-//                 name: true,
-//                 avatar: true,
-//                 englishLevel: true,
-//                 nativeLanguage: true,
-//                 learningLanguage: true,
-//                 userInterests: {
-//                   select: { interest: { select: { name: true } } },
-//                 },
-//               },
-//             },
-//           },
-//         }),
-//         Promise.all(liveIds.map((id) => this.get(id))),
-//       ]);
-
-//       const statusById = new Map<string, PresenceStatus>();
-//       for (const p of presences) {
-//         if (p) statusById.set(p.userId, p.status);
-//       }
-
-//       // Only expose users that still have a live presence record. Banned
-//       // accounts are dropped automatically because banned users cannot be
-//       // in a connected session.
-//       const exposed = users
-//         .filter((u) => statusById.has(u.id))
-//         .map((u) => ({
-//           id: u.id,
-//           name: u.profile?.name ?? "Conversation Partner",
-//           avatar: u.profile?.avatar ?? null,
-//           englishLevel: u.profile?.englishLevel ?? ("B1" as const),
-//           nativeLanguage: u.profile?.nativeLanguage ?? "English",
-//           learningLanguage: u.profile?.learningLanguage ?? "English",
-//           interests:
-//             u.profile?.userInterests?.map((ui) => ui.interest.name) ?? [],
-//           status: (statusById.get(u.id) ?? PresenceStatus.AVAILABLE) as string,
-//         }));
-
-//       const count = exposed.length;
-//       // Keep the cached counter aligned with the canonical list so the REST
-//       // endpoint and the socket payload never disagree.
-//       await this.redis.set(LIVE_COUNT_KEY, String(count));
-
-//       this.logger.log(`[LIVE] broadcasting LIVE_USERS count=${count}`);
-//       await this.events.broadcastLiveUsers(count, exposed);
-//     } catch (err) {
-//       this.logger.error(
-//         `[LIVE] LIVE_USERS broadcast failed: ${
-//           err instanceof Error ? err.message : String(err)
-//         }`,
-//       );
-//     }
-//   }
-// }
 import {
   Injectable,
   Logger,
@@ -302,6 +10,7 @@ import { PrismaService } from "../prisma/prisma.service";
 
 export enum PresenceStatus {
   OFFLINE = "OFFLINE",
+  ONLINE = "ONLINE",
   AVAILABLE = "AVAILABLE",
   SEARCHING = "SEARCHING",
   MATCHED = "MATCHED",
@@ -361,9 +70,9 @@ export class PresenceService {
   ): boolean {
     return (
       status ===
-        PresenceStatus.AVAILABLE ||
+      PresenceStatus.AVAILABLE ||
       status ===
-        PresenceStatus.SEARCHING
+      PresenceStatus.SEARCHING
     );
   }
 
@@ -466,6 +175,18 @@ export class PresenceService {
       LIVE_COUNT_KEY,
     );
   }
+  async isOnline(userId: string): Promise<boolean> {
+    const presence = await this.get(userId);
+
+    if (!presence) {
+      return false;
+    }
+
+    const healthy = await this.isHealthy(userId);
+
+    return healthy &&
+      presence.status !== PresenceStatus.OFFLINE;
+  }
 
   /**
    * Safely decrement cached live count.
@@ -517,13 +238,13 @@ export class PresenceService {
       existing &&
       (
         existing.status ===
-          PresenceStatus.MATCHED ||
+        PresenceStatus.MATCHED ||
         existing.status ===
-          PresenceStatus.CONNECTING ||
+        PresenceStatus.CONNECTING ||
         existing.status ===
-          PresenceStatus.IN_CALL ||
+        PresenceStatus.IN_CALL ||
         existing.status ===
-          PresenceStatus.ENDING
+        PresenceStatus.ENDING
       )
     ) {
       return this.upsert(
@@ -550,7 +271,7 @@ export class PresenceService {
           available
             ? null
             : existing?.currentCallId ??
-              null,
+            null,
       },
     );
   }
@@ -607,9 +328,9 @@ export class PresenceService {
 
     return (
       Date.now() -
-        presence.lastHeartbeat <=
+      presence.lastHeartbeat <=
       this.heartbeatTimeoutSeconds *
-        1000
+      1000
     );
   }
 
@@ -786,9 +507,9 @@ export class PresenceService {
           if (
             !presence ||
             Date.now() -
-              presence.lastHeartbeat >
-              this.heartbeatTimeoutSeconds *
-                1000
+            presence.lastHeartbeat >
+            this.heartbeatTimeoutSeconds *
+            1000
           ) {
             await this.setOffline(
               userId,
@@ -1000,10 +721,9 @@ export class PresenceService {
       );
     } catch (err) {
       this.logger.error(
-        `[LIVE] LIVE_USERS broadcast failed: ${
-          err instanceof Error
-            ? err.message
-            : String(err)
+        `[LIVE] LIVE_USERS broadcast failed: ${err instanceof Error
+          ? err.message
+          : String(err)
         }`,
       );
     }

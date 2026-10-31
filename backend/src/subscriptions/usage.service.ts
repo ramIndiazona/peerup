@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { SubscriptionPlan, UsageKind, User } from '@prisma/client';
+import { SubscriptionPlan, SubscriptionStatus, UsageKind, User } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
@@ -37,13 +37,21 @@ export class UsageService {
     };
   }
 
-  async getPlan(userId: string): Promise<SubscriptionPlan> {
-    const sub = await this.prisma.subscription.findUnique({ where: { userId } });
-    if (sub && sub.plan === SubscriptionPlan.PREMIUM && sub.status === 'ACTIVE') {
-      return SubscriptionPlan.PREMIUM;
-    }
-    return SubscriptionPlan.FREE;
-  }
+async getPlan(userId: string): Promise<SubscriptionPlan> {
+  const sub = await this.prisma.subscription.findUnique({
+    where: { userId },
+  });
+
+  const premiumIsActive =
+    sub?.plan === SubscriptionPlan.PREMIUM &&
+    sub.status === SubscriptionStatus.ACTIVE &&
+    sub.renewsAt !== null &&
+    sub.renewsAt > new Date();
+
+  return premiumIsActive
+    ? SubscriptionPlan.PREMIUM
+    : SubscriptionPlan.FREE;
+}
 
   async getUserTz(userId: string): Promise<string> {
     const profile = await this.prisma.profile.findUnique({

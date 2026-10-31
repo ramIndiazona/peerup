@@ -15,6 +15,13 @@ class SubscriptionStatusResult {
   final DateTime? canceledAt;
   final Map<String, dynamic> features;
 
+  /// True when the user has an active, non-expired Premium subscription.
+  bool get isPremiumActive =>
+      plan == SubscriptionPlan.premium &&
+      status == SubscriptionStatusEnum.active &&
+      renewsAt != null &&
+      renewsAt!.isAfter(DateTime.now());
+
   factory SubscriptionStatusResult.fromJson(Map<String, dynamic> json) =>
       SubscriptionStatusResult(
         plan: SubscriptionPlan.fromApi(json['plan'] as String?),
@@ -87,4 +94,52 @@ class PurchaseResult {
             : null,
     checkoutUrl: json['checkoutUrl'] as String?,
   );
+}
+
+/// The Razorpay order returned by `POST /subscriptions/purchase`.
+///
+/// The amount and currency are set by the backend and must never be
+/// overridden by the client.
+class RazorpayOrder {
+  const RazorpayOrder({
+    required this.orderId,
+    required this.keyId,
+    required this.amount,
+    required this.currency,
+  });
+
+  final String orderId;
+  final String keyId;
+  final int amount; // paise
+  final String currency;
+
+  factory RazorpayOrder.fromJson(Map<String, dynamic> json) => RazorpayOrder(
+    orderId: json['orderId'] as String? ?? '',
+    keyId: json['keyId'] as String? ?? '',
+    amount: (json['amount'] as num?)?.toInt() ?? 0,
+    currency: json['currency'] as String? ?? 'INR',
+  );
+}
+
+/// The result of `POST /subscriptions/verify-payment`.
+class PaymentVerificationResult {
+  const PaymentVerificationResult({
+    required this.success,
+    required this.status,
+    required this.plan,
+    this.renewsAt,
+  });
+
+  final bool success;
+  final String status;
+  final SubscriptionPlan plan;
+  final DateTime? renewsAt;
+
+  factory PaymentVerificationResult.fromJson(Map<String, dynamic> json) =>
+      PaymentVerificationResult(
+        success: json['success'] == true,
+        status: json['status'] as String? ?? '',
+        plan: SubscriptionPlan.fromApi(json['plan'] as String?),
+        renewsAt: SubscriptionStatusResult._dt(json['renewsAt']),
+      );
 }

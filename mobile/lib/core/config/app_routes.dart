@@ -17,6 +17,7 @@ class AppRoutes {
 
   static const String publicProfile = '/profile/:id';
   static const String premium = '/premium';
+  static const String subscription = '/subscription';
   static const String notifications = '/notifications';
   static const String friends = '/friends';
   static const String chat = '/chat/:friendId';

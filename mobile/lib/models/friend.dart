@@ -108,12 +108,31 @@ class Friend {
     Map<String, dynamic> root,
     Map<String, dynamic> profile,
   ) {
+    // for (final source in [profile, root]) {
+    //   final online = source['online'] ?? source['isOnline'];
+    //   if (online is bool) return online;
+    //   final status = source['status'];
+    //   if (status is String) {
+    //     return status.toUpperCase() != 'OFFLINE';
+    //   }
+    // }
+
     for (final source in [profile, root]) {
-      final online = source['online'] ?? source['isOnline'];
-      if (online is bool) return online;
-      final status = source['status'];
-      if (status is String) {
-        return status.toUpperCase() != 'OFFLINE';
+      final value = source['online'] ?? source['isOnline'];
+
+      if (value is bool) return value;
+      if (value is num) return value == 1;
+
+      if (value is String) {
+        final normalized = value.toLowerCase();
+
+        if (normalized == 'online' || normalized == 'true') {
+          return true;
+        }
+
+        if (normalized == 'offline' || normalized == 'false') {
+          return false;
+        }
       }
     }
     return false;

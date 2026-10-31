@@ -49,6 +49,7 @@ class NotificationsCubit extends Cubit<NotificationsState> {
     emit(state.copyWith(status: NotificationsStatus.loading, clearError: true));
     try {
       final result = await _repo.list(page: 1, limit: _pageSize);
+    
       if (isClosed) return;
       emit(
         NotificationsState(
@@ -160,6 +161,44 @@ class NotificationsCubit extends Cubit<NotificationsState> {
         ],
       ),
     );
+  }
+
+  /// Accept a pending friend request referenced by a notification.
+  ///
+  /// The backend resolves the stored notification metadata, so the action
+  /// disappears after a refresh. We also update the local copy immediately.
+  Future<bool> acceptFriendRequest(AppNotification notification) async {
+    final requestId = notification.data?['requestId'];
+    if (requestId is! String || requestId.isEmpty) return false;
+
+    try {
+      await _repo.acceptFriendRequest(requestId);
+    } catch (e) {
+      if (isClosed) return false;
+      emit(state.copyWith(error: e));
+      return false;
+    }
+    if (isClosed) return false;
+
+    final now = DateTime.now();
+    final updated = [
+      for (final item in state.items)
+        if (item.id == notification.id)
+          AppNotification(
+            id: item.id,
+            type: item.type,
+            title: item.title,
+            body: item.body,
+            data: {...?item.data, 'kind': 'FRIEND_REQUEST_ACCEPTED'},
+            readAt: item.readAt ?? now,
+            createdAt: item.createdAt,
+          )
+        else
+          item,
+    ];
+
+    emit(state.copyWith(items: updated));
+    return true;
   }
 
   void _onServerEvent(RealtimeRawEvent event) {

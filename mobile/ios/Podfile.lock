@@ -14,6 +14,12 @@ PODS:
   - path_provider_foundation (0.0.1):
     - Flutter
     - FlutterMacOS
+  - razorpay-core-pod (1.0.7)
+  - razorpay-pod (1.5.6):
+    - razorpay-core-pod (= 1.0.7)
+  - razorpay_flutter (1.1.10):
+    - Flutter
+    - razorpay-pod
   - rive_native (0.0.1):
     - Flutter
   - speech_to_text (7.2.0):
@@ -31,6 +37,7 @@ DEPENDENCIES:
   - flutter_tts (from `.symlinks/plugins/flutter_tts/ios`)
   - flutter_webrtc (from `.symlinks/plugins/flutter_webrtc/ios`)
   - path_provider_foundation (from `.symlinks/plugins/path_provider_foundation/darwin`)
+  - razorpay_flutter (from `.symlinks/plugins/razorpay_flutter/ios`)
   - rive_native (from `.symlinks/plugins/rive_native/ios`)
   - speech_to_text (from `.symlinks/plugins/speech_to_text/darwin`)
   - sqflite_darwin (from `.symlinks/plugins/sqflite_darwin/darwin`)
@@ -39,6 +46,8 @@ SPEC REPOS:
   trunk:
     - CwlCatchException
     - CwlCatchExceptionSupport
+    - razorpay-core-pod
+    - razorpay-pod
     - WebRTC-SDK
 
 EXTERNAL SOURCES:
@@ -52,6 +61,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/flutter_webrtc/ios"
   path_provider_foundation:
     :path: ".symlinks/plugins/path_provider_foundation/darwin"
+  razorpay_flutter:
+    :path: ".symlinks/plugins/razorpay_flutter/ios"
   rive_native:
     :path: ".symlinks/plugins/rive_native/ios"
   speech_to_text:
@@ -67,6 +78,9 @@ SPEC CHECKSUMS:
   flutter_tts: 91ad1884033cd95ef6e9338754adad54f01f090f
   flutter_webrtc: e0ea105ab0892632c46cf0cdd61b865259777f55
   path_provider_foundation: 2b6b4c569c0fb62ec74538f866245ac84301af46
+  razorpay-core-pod: c7f3ac3d214c1a7fac4e9a59c1de7eac02130573
+  razorpay-pod: e939db88bc67c33a84bcc419505b8546b1081023
+  razorpay_flutter: 84b3bfd206ae9c9c2a9ba585524a1b3d8102b6c1
   rive_native: 6fd739ece3e1976374c6804badde07053aa05b36
   speech_to_text: 87bf9298952e8d9073be1b6aade6d5758db5170c
   sqflite_darwin: 5a7236e3b501866c1c9befc6771dfd73ffb8702d

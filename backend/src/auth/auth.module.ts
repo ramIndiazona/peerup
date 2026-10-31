@@ -17,7 +17,7 @@ import { TokenService } from './token.service';
       useFactory: (config: ConfigService) => ({
         secret: config.get<string>('jwt.secret'),
         signOptions: {
-          expiresIn: config.get<string>('jwt.expiresIn', '15m'),
+          expiresIn: config.get<string>('jwt.expiresIn', '7d'),
           issuer: config.get<string>('jwt.issuer', 'peerup'),
         },
       }),

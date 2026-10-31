@@ -22,8 +22,7 @@ class FriendsCubit extends Cubit<LoadState<List<Friend>>> {
   }) : _repo = repo,
        _socket = socket,
        _currentUserId = currentUserId,
-       super(const LoadState.idle()) 
-       {
+       super(const LoadState.idle()) {
     final bus = _socket;
     if (bus != null) {
       for (final event in _friendshipEvents) {
@@ -47,8 +46,7 @@ class FriendsCubit extends Cubit<LoadState<List<Friend>>> {
   StreamSubscription<RealtimeRawEvent>? _eventsSub;
   StreamSubscription<RealtimeConnectionState>? _connectionSub;
 
-  Future<void> load() async
-   {
+  Future<void> load() async {
     emit(const LoadState.loading());
     try {
       final page = await _repo.list(
@@ -57,16 +55,23 @@ class FriendsCubit extends Cubit<LoadState<List<Friend>>> {
         currentUserId: _currentUserId?.call(),
       );
       final items = _dedupe(page.items);
+
+      for (final friend in page.items) {
+        debugPrint(
+          '[FRIENDS] id=${friend.id}, '
+          'name=${friend.name}, '
+          'online=${friend.online}',
+        );
+      }
+
       emit(LoadState.data(items));
-    } catch (e) 
-    {
+    } catch (e) {
       if (isClosed) return;
       emit(LoadState.error(e));
     }
   }
 
   Future<void> refresh() => load();
-
 
   // Future<void> sendFriendRequest() async
   //  {
@@ -78,39 +83,37 @@ class FriendsCubit extends Cubit<LoadState<List<Friend>>> {
   //     );
   //     final items = _dedupe(page.items);
   //     emit(LoadState.data(items));
-  //   } catch (e) 
+  //   } catch (e)
   //   {
   //     if (isClosed) return;
   //     emit(LoadState.error(e));
   //   }
   // }
 
-Future<dynamic> submitCallFeedback({
-  required String receiverId,
- required String? reaction,
-  required List<String> feedback,
-  required bool addToFriends,
-  required bool connectAgain,
-}) async {
-  final response = await _repo.sendFriendRequest(
-    receiverId: receiverId,
-    reaction: reaction,
-    feedback: feedback,
-    addToFriends: addToFriends,
-    connectAgain: connectAgain,
-  );
+  Future<dynamic> submitCallFeedback({
+    required String receiverId,
+    required String? reaction,
+    required List<String> feedback,
+    required bool addToFriends,
+    required bool connectAgain,
+  }) async {
+    final response = await _repo.sendFriendRequest(
+      receiverId: receiverId,
+      reaction: reaction,
+      feedback: feedback,
+      addToFriends: addToFriends,
+      connectAgain: connectAgain,
+    );
 
-  // Refresh accepted friends after submitting the request.
-  // Pending requests will not appear in the accepted-friends list.
-  if (addToFriends && !isClosed) {
-    await load();
+    // Refresh accepted friends after submitting the request.
+    // Pending requests will not appear in the accepted-friends list.
+    if (addToFriends && !isClosed) {
+      await load();
+    }
+
+    return response;
   }
 
-  return response;
-}
-  
-  
-  
   /// Refresh when a friendship is created or accepted.
   ///
   /// We deliberately re-fetch from the backend (source of truth) instead of

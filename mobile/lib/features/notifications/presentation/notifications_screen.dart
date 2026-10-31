@@ -137,11 +137,25 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 }
 
-class _NotificationTile extends StatelessWidget {
+class _NotificationTile extends StatefulWidget {
   const _NotificationTile({required this.notification, required this.onTap});
 
   final AppNotification notification;
   final VoidCallback onTap;
+
+  @override
+  State<_NotificationTile> createState() => _NotificationTileState();
+}
+
+class _NotificationTileState extends State<_NotificationTile> {
+  bool _accepting = false;
+
+  AppNotification get notification => widget.notification;
+
+  bool get _isPendingFriendRequest {
+    final data = notification.data;
+    return data?['kind'] == 'FRIEND_REQUEST' && data?['requestId'] is String;
+  }
 
   IconData get _icon => switch (notification.type) {
     NotificationTypeEnum.subscription => Icons.workspace_premium_outlined,
@@ -150,11 +164,32 @@ class _NotificationTile extends StatelessWidget {
     NotificationTypeEnum.system => Icons.notifications_outlined,
   };
 
+  Future<void> _accept() async {
+    if (_accepting) return;
+    setState(() => _accepting = true);
+
+    final ok = await context
+        .read<NotificationsCubit>()
+        .acceptFriendRequest(notification);
+
+    if (!mounted) return;
+    setState(() => _accepting = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          ok
+              ? 'Friend request accepted.'
+              : 'Unable to accept friend request.',
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final unread = !notification.isRead;
     return ListTile(
-      onTap: onTap,
+      onTap: widget.onTap,
       leading: Container(
         width: 44,
         height: 44,
@@ -181,7 +216,28 @@ class _NotificationTile extends StatelessWidget {
         style: const TextStyle(color: _muted, height: 1.3),
       ),
       trailing:
-          unread
+          _isPendingFriendRequest
+              ? TextButton(
+                onPressed: _accepting ? null : _accept,
+                child:
+                    _accepting
+                        ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: _accent,
+                          ),
+                        )
+                        : const Text(
+                          'Accept',
+                          style: TextStyle(
+                            color: _accent,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+              )
+              : unread
               ? const SizedBox(
                 width: 10,
                 height: 10,

@@ -12,7 +12,7 @@ export default () => ({
   jwt: {
     secret: process.env.JWT_SECRET,
     refreshSecret: process.env.JWT_REFRESH_SECRET,
-    expiresIn: process.env.JWT_EXPIRES_IN || '15m',
+    expiresIn: process.env.JWT_EXPIRES_IN || '7d',
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '30d',
     issuer: process.env.JWT_ISSUER || 'peerup',
   },
@@ -56,7 +56,7 @@ export default () => ({
       process.env.OLLAMA_URL || 'http://localhost:11434',
     ollamaModel:
       process.env.OLLAMA_MODEL || 'gemma4:e2b',
-      
+
   },
   firebase: {
     projectId: process.env.FIREBASE_PROJECT_ID,
@@ -75,8 +75,23 @@ export default () => ({
   sentry: {
     dsn: process.env.SENTRY_DSN,
   },
+
+
   payment: {
-    provider: process.env.PAYMENT_PROVIDER || 'none',
+    provider: process.env.PAYMENT_PROVIDER ?? 'none',
+    razorpayKeyId: process.env.RAZORPAY_KEY_ID,
+    razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET,
+    // Server-controlled prices in paise. Never trust a price sent by Flutter.
+    monthlyPricePaise: Number(
+      process.env.PREMIUM_MONTHLY_PRICE_PAISE ?? 19900,
+    ),
+    yearlyPricePaise: Number(
+      process.env.PREMIUM_YEARLY_PRICE_PAISE ?? 99900,
+    ),
+    // Kept for backward compatibility; defaults to the monthly price.
+    premiumPricePaise: Number(
+      process.env.PREMIUM_PRICE_PAISE ?? 19900,
+    ),
   },
   cors: {
     origins: (process.env.CORS_ORIGINS || 'http://localhost:3100,http://localhost:3000,http://localhost:8080')

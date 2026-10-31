@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/config/app_routes.dart';
 import '../../../core/widgets/async_content.dart';
 import '../../../models/enums.dart';
 import '../../../models/subscription.dart';
@@ -137,29 +139,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
               const SizedBox(height: 20),
               if (status?.plan != SubscriptionPlan.premium)
                 FilledButton.icon(
-                  onPressed: () async {
-                    final result =
-                        await context.read<PremiumCubit>().purchase();
-                    if (!context.mounted) return;
-                    if (result.mode == 'trial') {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Premium trial started for ${result.premiumDays} days!',
-                          ),
-                        ),
-                      );
-                      await context.read<PremiumCubit>().load();
-                    } else if (result.checkoutUrl != null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Checkout flow will open here when a payment provider is wired.',
-                          ),
-                        ),
-                      );
-                    }
-                  },
+                  onPressed: () => context.push(AppRoutes.subscription),
                   icon: const Icon(Icons.rocket_launch_rounded),
                   label: const Text('Upgrade to Premium'),
                 )

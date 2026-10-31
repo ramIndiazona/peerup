@@ -1,4 +1,5 @@
 import {
+    Body,
     Controller,
     Get,
     HttpCode,
@@ -9,6 +10,7 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { SubmitCallFeedbackDto } from './dto/submit-call-feedback.dto';
 import { FriendRequestsService } from './friend-requests.service';
 
 @ApiTags('friend-requests')
@@ -19,6 +21,16 @@ export class FriendRequestsController {
     constructor(
         private readonly friendRequests: FriendRequestsService,
     ) { }
+
+    @Post()
+    @HttpCode(201)
+    @ApiOperation({ summary: 'Submit post-call feedback and optionally add the peer as a friend' })
+    submitCallFeedback(
+        @CurrentUser('id') userId: string,
+        @Body() dto: SubmitCallFeedbackDto,
+    ) {
+        return this.friendRequests.submitCallFeedback(userId, dto);
+    }
 
     @Post(':userId')
     @HttpCode(201)

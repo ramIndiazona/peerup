@@ -12,6 +12,7 @@ class NotificationsRepository {
       APIURL.notificationsList,
       query: {'page': page, 'limit': limit},
     );
+    print("object ${data}");
     return NotificationListResult.fromJson(
       (data as Map).cast<String, dynamic>(),
     );
@@ -19,6 +20,10 @@ class NotificationsRepository {
 
   Future<void> markRead(String id) async {
     await _api.patch(APIURL.notificationMarkRead(id));
+  }
+
+  Future<void> acceptFriendRequest(String requestId) async {
+    await _api.post(APIURL.acceptFriendRequest(requestId));
   }
 
   Future<void> registerDeviceToken(String token, String platform) async {

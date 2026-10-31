@@ -35,7 +35,7 @@ export class TokenService {
   ) {
     this.accessSecret = config.getOrThrow<string>('jwt.secret');
     this.refreshSecret = config.getOrThrow<string>('jwt.refreshSecret');
-    this.accessExpiresIn = config.get<string>('jwt.expiresIn', '15m');
+    this.accessExpiresIn = config.get<string>('jwt.expiresIn', '7d');
     this.refreshExpiresIn = this.parseDuration(
       config.get<string>('jwt.refreshExpiresIn', '30d'),
     );

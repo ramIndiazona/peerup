@@ -166,6 +166,8 @@ model User {
   messages               Message[]
   sentFriendRequests     FriendRequest[] @relation("FriendRequestSender")
   receivedFriendRequests FriendRequest[] @relation("FriendRequestReceiver")
+  callFeedbackSent       CallFeedback[]  @relation("CallFeedbackSender")
+  callFeedbackReceived   CallFeedback[]  @relation("CallFeedbackReceiver")
 
   @@index([email])
   @@index([status, lastSeenAt])
@@ -277,7 +279,8 @@ model CallSession {
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
-  reports Report[]
+  reports      Report[]
+  callFeedback CallFeedback[]
 
   @@index([userAId, status])
   @@index([userBId, status])
@@ -515,6 +518,33 @@ model FriendRequest {
   @@index([senderId, status])
 }
 
+enum CallReaction {
+  LIKE
+  DISLIKE
+}
+
+model CallFeedback {
+  id            String        @id @default(cuid())
+  dedupeKey     String        @unique
+  senderId      String
+  receiverId    String
+  callSessionId String?
+  reaction      CallReaction?
+  feedback      String[]      @default([])
+  addToFriends  Boolean       @default(false)
+  connectAgain  Boolean       @default(false)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  sender      User         @relation("CallFeedbackSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver    User         @relation("CallFeedbackReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  callSession CallSession? @relation(fields: [callSessionId], references: [id], onDelete: SetNull)
+
+  @@index([senderId, createdAt])
+  @@index([receiverId, createdAt])
+  @@index([callSessionId])
+}
+
 model DirectConversation {
   id        String   @id @default(cuid())
   userOneId String
@@ -538,4 +568,19 @@ model DirectMessage {
   conversation DirectConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@index([conversationId, createdAt])
+}
+
+model PaymentOrder {
+  id              String   @id @default(cuid())
+  userId          String
+  plan            String   @default("FREE")
+  providerOrderId String   @unique
+  amount          Int
+  currency        String   @default("INR")
+  status          String   @default("CREATED")
+  paymentId       String?  @unique
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
 }

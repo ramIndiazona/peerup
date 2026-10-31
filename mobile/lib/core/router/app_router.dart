@@ -28,10 +28,13 @@ import '../../models/friend.dart';
 import '../realtime/realtime_socket_service.dart';
 import '../../features/onboarding/onboarding_screen.dart';
 import '../../features/premium/presentation/premium_screen.dart';
+import '../../features/premium/subscription_repository.dart';
 import '../../features/profile/presentation/edit_profile_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/profile/presentation/public_profile_screen.dart';
 import '../../features/settings/settings_screen.dart';
+import '../../features/subscription/bloc/subscription_bloc.dart';
+import '../../features/subscription/presentation/subscription_screen.dart';
 import '../config/app_routes.dart';
 
 class AppRouter {
@@ -272,6 +275,23 @@ class AppRouter {
           name: 'premium',
           builder: (context, state) {
             return const PremiumScreen();
+          },
+        ),
+
+        // --------------------------------------------------
+        // SUBSCRIPTION (Razorpay Premium purchase flow)
+        // --------------------------------------------------
+        GoRoute(
+          path: AppRoutes.subscription,
+          name: 'subscription',
+          builder: (context, state) {
+            return BlocProvider(
+              create:
+                  (_) => SubscriptionBloc(
+                    repo: context.read<SubscriptionRepository>(),
+                  ),
+              child: const SubscriptionScreen(),
+            );
           },
         ),
 
